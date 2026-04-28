@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,17 +6,31 @@ import { detectClaudeCode } from '../../../src/manifest/claude.js';
 
 const FIXTURES = join(__dirname, '..', '..', 'fixtures');
 
+/**
+ * Cross-platform homedir override (Pitfall 7 mitigation):
+ *
+ * `process.env.HOME = tmpHome` does NOT redirect `os.homedir()` on Windows
+ * (Node reads USERPROFILE there, not HOME). Use vi.mock + importOriginal so
+ * the override works on darwin / linux / win32 alike.
+ */
+const homedirHolder: { current: string | null } = { current: null };
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    homedir: () => homedirHolder.current ?? actual.homedir(),
+  };
+});
+
 describe('detectClaudeCode', () => {
-  let originalHome: string | undefined;
   let tmpHome: string | null = null;
 
   beforeEach(() => {
-    originalHome = process.env.HOME;
+    homedirHolder.current = null;
   });
 
   afterEach(() => {
-    if (originalHome !== undefined) process.env.HOME = originalHome;
-    else delete process.env.HOME;
+    homedirHolder.current = null;
     if (tmpHome) {
       rmSync(tmpHome, { recursive: true, force: true });
       tmpHome = null;
@@ -45,7 +59,7 @@ describe('detectClaudeCode', () => {
       join(tmpHome, '.claude.json'),
       JSON.stringify({ mcpServers: { 'github': {} } }),
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     const github = result.tools.find((t) => t.name === 'github');
     expect(github).toBeDefined();
@@ -64,7 +78,7 @@ describe('detectClaudeCode', () => {
       join(tmpHome, '.claude', 'settings.json'),
       JSON.stringify({ mcpServers: { 'shared': {}, 'settings-only': {} } }),
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     expect(result.tools.find((t) => t.name === 'github')).toBeDefined();
     expect(result.tools.find((t) => t.name === 'shared')).toBeDefined();
@@ -86,7 +100,7 @@ describe('detectClaudeCode', () => {
         },
       }),
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     const swift = result.tools.find((t) => t.name === 'swift-lsp');
     const rust = result.tools.find((t) => t.name === 'rust-analyzer');
@@ -107,14 +121,14 @@ describe('detectClaudeCode', () => {
         plugins: { 'future-plugin@x': [{}] },
       }),
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     expect(result.tools.find((t) => t.type === 'plugin')).toBeUndefined();
   });
 
   it('handles missing files gracefully (returns empty, no exception)', async () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-claude-empty-'));
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     expect(result.tools).toEqual([]);
     // pathsScanned should still record the three paths we tried
@@ -124,7 +138,7 @@ describe('detectClaudeCode', () => {
   it('handles malformed JSON gracefully (returns empty, pathsScanned still includes path)', async () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-claude-bad-'));
     writeFileSync(join(tmpHome, '.claude.json'), '{not valid json');
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectClaudeCode({ scope: 'user' });
     expect(result.tools.find((t) => t.name === 'should-not-exist')).toBeUndefined();
     expect(result.pathsScanned.some((p) => p.endsWith('.claude.json'))).toBe(true);

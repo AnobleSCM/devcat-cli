@@ -1,20 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectCodex } from '../../../src/manifest/codex.js';
 
+// Cross-platform homedir override (Pitfall 7): process.env.HOME doesn't
+// affect os.homedir() on Windows. Mock node:os instead.
+const homedirHolder: { current: string | null } = { current: null };
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    homedir: () => homedirHolder.current ?? actual.homedir(),
+  };
+});
+
 describe('detectCodex', () => {
-  let originalHome: string | undefined;
   let tmpHome: string | null = null;
 
   beforeEach(() => {
-    originalHome = process.env.HOME;
+    homedirHolder.current = null;
   });
 
   afterEach(() => {
-    if (originalHome !== undefined) process.env.HOME = originalHome;
-    else delete process.env.HOME;
+    homedirHolder.current = null;
     if (tmpHome) {
       rmSync(tmpHome, { recursive: true, force: true });
       tmpHome = null;
@@ -33,7 +42,7 @@ describe('detectCodex', () => {
       '[mcp_servers.serena]\n' +
       'command = "uv"\n',
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectCodex({ scope: 'user' });
     expect(result.tools).toHaveLength(2);
     expect(result.tools.find((t) => t.name === 'openai-tools')).toBeDefined();
@@ -44,7 +53,7 @@ describe('detectCodex', () => {
 
   it('handles missing config.toml gracefully (returns empty, pathsScanned includes path)', async () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-codex-missing-'));
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectCodex({ scope: 'user' });
     expect(result.tools).toEqual([]);
     expect(result.pathsScanned).toHaveLength(1);
@@ -56,7 +65,7 @@ describe('detectCodex', () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-codex-bad-'));
     mkdirSync(join(tmpHome, '.codex'), { recursive: true });
     writeFileSync(join(tmpHome, '.codex', 'config.toml'), '][[invalid toml]\n');
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectCodex({ scope: 'user' });
     expect(result.tools).toEqual([]);
     expect(result.pathsScanned.length).toBe(1);

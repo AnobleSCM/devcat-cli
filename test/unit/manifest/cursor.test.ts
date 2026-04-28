@@ -1,20 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectCursor } from '../../../src/manifest/cursor.js';
 
+// Cross-platform homedir override (Pitfall 7): process.env.HOME doesn't
+// affect os.homedir() on Windows. Mock node:os instead.
+const homedirHolder: { current: string | null } = { current: null };
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    homedir: () => homedirHolder.current ?? actual.homedir(),
+  };
+});
+
 describe('detectCursor', () => {
-  let originalHome: string | undefined;
   let tmpHome: string | null = null;
 
   beforeEach(() => {
-    originalHome = process.env.HOME;
+    homedirHolder.current = null;
   });
 
   afterEach(() => {
-    if (originalHome !== undefined) process.env.HOME = originalHome;
-    else delete process.env.HOME;
+    homedirHolder.current = null;
     if (tmpHome) {
       rmSync(tmpHome, { recursive: true, force: true });
       tmpHome = null;
@@ -28,7 +37,7 @@ describe('detectCursor', () => {
       join(tmpHome, '.cursor', 'mcp.json'),
       JSON.stringify({ mcpServers: { 'supabase': {}, 'cloudflare': {} } }),
     );
-    process.env.HOME = tmpHome;
+    homedirHolder.current = tmpHome;
     const result = await detectCursor({ scope: 'user' });
     expect(result.tools).toHaveLength(2);
     expect(result.tools.find((t) => t.name === 'supabase')).toBeDefined();
