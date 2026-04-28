@@ -28,6 +28,11 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': 'off',
+      // TypeScript itself catches undefined identifiers; eslint's no-undef
+      // produces false positives on ambient types like RequestInit (from
+      // lib.dom.d.ts) that have no runtime presence. Standard typescript-
+      // eslint guidance is to disable no-undef for .ts files.
+      'no-undef': 'off',
     },
   },
 ];
