@@ -9,7 +9,7 @@ const globals = require('globals');
 
 module.exports = [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.cjs'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.cjs', 'eslint.config.js', 'vitest.config.ts'],
   },
   js.configs.recommended,
   {
