@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["@supabase/mcp"],
+      "env": { "SUPABASE_ACCESS_TOKEN": "sbp_test_secret_cursor" }
+    }
+  }
+}

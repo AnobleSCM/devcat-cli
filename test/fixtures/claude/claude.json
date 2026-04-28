@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/github-mcp"],
+      "env": { "GITHUB_TOKEN": "ghp_test_secret_xxxxxxxxxxxx" }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["overridden", "by", "user", "scope"]
+    }
+  }
+}

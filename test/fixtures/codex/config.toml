@@ -1,0 +1,10 @@
+[mcp_servers.openai-tools]
+command = "npx"
+args = ["-y", "@openai/mcp-tools"]
+
+[mcp_servers.openai-tools.env]
+OPENAI_API_KEY = "sk-test_secret_codex_xxxxxxxxxxxx"
+
+[mcp_servers.serena]
+command = "uv"
+args = ["run", "serena"]
