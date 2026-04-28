@@ -8,7 +8,7 @@
  *   2 = auth-specific (token invalid, device flow timeout, user denied, refresh expired)
  *
  * Use cases:
- *   `if [ $? -eq 2 ]; then npx devcat sync; fi`  — CI script re-trigger device flow
+ *   `if [ $? -eq 2 ]; then npx @anoblescm/devcat sync; fi`  — CI script re-trigger device flow
  */
 export const EXIT_OK = 0;
 export const EXIT_GENERIC_ERROR = 1;

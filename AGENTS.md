@@ -4,7 +4,7 @@
 
 Use `/Users/andrewnoble/AGENTS.md` as the workspace-wide contract.
 
-This repo is the standalone DevCat CLI package for `npx devcat sync`. It is public, MIT-licensed, and publishes the `devcat` npm package. Be especially conservative around auth, token storage, package contents, and publish actions.
+This repo is the standalone DevCat CLI package for `npx @anoblescm/devcat sync`. It is public, MIT-licensed, and publishes the `@anoblescm/devcat` npm package with the `devcat` binary. Be especially conservative around auth, token storage, package contents, and publish actions.
 
 ## Quick Commands
 

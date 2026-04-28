@@ -1,6 +1,6 @@
 # DevCat CLI
 
-`npx devcat sync` — push your AI tool manifest to [devcat.dev](https://devcat.dev).
+`npx @anoblescm/devcat sync` — push your AI tool manifest to [devcat.dev](https://devcat.dev).
 
 Manifest-only sync via RFC 8628 device authorization. Tokens stored in your OS keychain. Never sends env vars, configs, secrets, or file contents.
 
@@ -8,10 +8,10 @@ Manifest-only sync via RFC 8628 device authorization. Tokens stored in your OS k
 
 ```bash
 # Zero-install via npx (recommended)
-npx devcat sync
+npx @anoblescm/devcat sync
 
 # Or install globally
-npm install -g devcat
+npm install -g @anoblescm/devcat
 devcat sync
 ```
 
@@ -22,7 +22,7 @@ Requires Node.js 20 or later. Works on macOS, Linux, and Windows.
 From any directory:
 
 ```bash
-npx devcat sync
+npx @anoblescm/devcat sync
 ```
 
 On the first run you'll see something like:
@@ -122,9 +122,9 @@ On WSL, if polling repeatedly fails with throttle responses, run `wsl --update` 
 
 The error message includes the exact next step. Most common:
 
-- `Rate-limited. Try \`npx devcat sync\` again in a moment.` — wait 60 seconds.
-- `Approval timed out after 10 minutes.` — run `npx devcat sync` again to mint a new code.
-- `Approval canceled.` — you clicked Cancel at /device. Run `npx devcat sync` again if you change your mind.
+- `Rate-limited. Try \`npx @anoblescm/devcat sync\` again in a moment.` — wait 60 seconds.
+- `Approval timed out after 10 minutes.` — run `npx @anoblescm/devcat sync` again to mint a new code.
+- `Approval canceled.` — you clicked Cancel at /device. Run `npx @anoblescm/devcat sync` again if you change your mind.
 - `Session expired. Let's get you signed in again.` — refresh token is older than 24 hours. The CLI auto-runs the device flow inline; just type when prompted.
 
 ## Security

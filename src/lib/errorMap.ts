@@ -23,12 +23,12 @@ export function mapErrorCode(code: ErrorCode | string, fallbackMessage?: string)
     // /api/sync errors
     case 'schema_violation':
       return {
-        message: 'Manifest failed validation. Try `npx devcat sync` again or report an issue at https://github.com/AnobleSCM/devcat-cli/issues.',
+        message: 'Manifest failed validation. Try `npx @anoblescm/devcat sync` again or report an issue at https://github.com/AnobleSCM/devcat-cli/issues.',
         exitCode: EXIT_GENERIC_ERROR,
       };
     case 'rate_limit_exceeded':
       return {
-        message: 'Rate-limited. Try `npx devcat sync` again in a moment.',
+        message: 'Rate-limited. Try `npx @anoblescm/devcat sync` again in a moment.',
         exitCode: EXIT_GENERIC_ERROR,
       };
     case 'payload_too_large':
@@ -38,13 +38,13 @@ export function mapErrorCode(code: ErrorCode | string, fallbackMessage?: string)
       };
     case 'idempotency_conflict':
       return {
-        message: 'A previous sync is still in flight. Try `npx devcat sync` again in a moment.',
+        message: 'A previous sync is still in flight. Try `npx @anoblescm/devcat sync` again in a moment.',
         exitCode: EXIT_GENERIC_ERROR,
       };
     case 'invalid_json':
     case 'invalid_request':
       return {
-        message: 'Sync failed. Try `npx devcat sync` again or report an issue at https://github.com/AnobleSCM/devcat-cli/issues.',
+        message: 'Sync failed. Try `npx @anoblescm/devcat sync` again or report an issue at https://github.com/AnobleSCM/devcat-cli/issues.',
         exitCode: EXIT_GENERIC_ERROR,
       };
     case 'sync_disabled':
@@ -54,7 +54,7 @@ export function mapErrorCode(code: ErrorCode | string, fallbackMessage?: string)
       };
     case 'internal_error':
       return {
-        message: 'DevCat server returned an error. Try `npx devcat sync` again in a moment.',
+        message: 'DevCat server returned an error. Try `npx @anoblescm/devcat sync` again in a moment.',
         exitCode: EXIT_GENERIC_ERROR,
       };
 
@@ -74,35 +74,35 @@ export function mapErrorCode(code: ErrorCode | string, fallbackMessage?: string)
     // Device flow errors -> exit 2
     case 'expired_token':
       return {
-        message: 'Approval timed out after 10 minutes. Run `npx devcat sync` again to get a new code.',
+        message: 'Approval timed out after 10 minutes. Run `npx @anoblescm/devcat sync` again to get a new code.',
         exitCode: EXIT_AUTH_ERROR,
       };
     case 'access_denied':
       return {
-        message: 'Approval canceled. Run `npx devcat sync` again if you change your mind.',
+        message: 'Approval canceled. Run `npx @anoblescm/devcat sync` again if you change your mind.',
         exitCode: EXIT_AUTH_ERROR,
       };
     case 'code_consumed':
       return {
-        message: 'That device code was already used. Run `npx devcat sync` again to get a new one.',
+        message: 'That device code was already used. Run `npx @anoblescm/devcat sync` again to get a new one.',
         exitCode: EXIT_AUTH_ERROR,
       };
     case 'invalid_grant':
       return {
-        message: 'Device code is invalid. Run `npx devcat sync` again.',
+        message: 'Device code is invalid. Run `npx @anoblescm/devcat sync` again.',
         exitCode: EXIT_AUTH_ERROR,
       };
 
     // Method/transport
     case 'method_not_allowed':
       return {
-        message: 'DevCat server returned an unexpected response. Update the CLI: `npm install -g devcat@latest`.',
+        message: 'DevCat server returned an unexpected response. Update the CLI: `npm install -g @anoblescm/devcat@latest`.',
         exitCode: EXIT_GENERIC_ERROR,
       };
 
     default:
       return {
-        message: fallbackMessage ?? 'Sync failed. Try `npx devcat sync` again.',
+        message: fallbackMessage ?? 'Sync failed. Try `npx @anoblescm/devcat sync` again.',
         exitCode: EXIT_GENERIC_ERROR,
       };
   }

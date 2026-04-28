@@ -211,7 +211,7 @@ describe('sync --json event sequence', () => {
       expect(events.map((event) => event.type)).toContain('device.code.expired');
       expect(events.at(-1)).toMatchObject({
         type: 'sync.error',
-        message: 'Approval timed out after 10 minutes. Run `npx devcat sync` again to get a new code.',
+        message: 'Approval timed out after 10 minutes. Run `npx @anoblescm/devcat sync` again to get a new code.',
         exit_code: 2,
       });
     } finally {
