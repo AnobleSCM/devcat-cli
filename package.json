@@ -23,7 +23,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('node:fs').chmodSync('dist/bin/devcat.js', 0o755)\"",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
