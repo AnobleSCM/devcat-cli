@@ -9,7 +9,7 @@ import { EXIT_OK, type ExitCode } from '../lib/exitCodes.js';
 export async function runLogout(): Promise<ExitCode> {
   await clearToken().catch(() => undefined);
   process.stdout.write(
-    `${SUCCESS_GLYPH} ${c.bold('Logged out.')} Run \`npx @anoblescm/devcat sync\` to sign back in.\n`,
+    `${SUCCESS_GLYPH} ${c.bold('Logged out.')} Run \`npx @devcat/cli sync\` to sign back in.\n`,
   );
   return EXIT_OK;
 }

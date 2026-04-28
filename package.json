@@ -1,7 +1,7 @@
 {
-  "name": "@anoblescm/devcat",
+  "name": "@devcat/cli",
   "version": "0.1.0",
-  "description": "DevCat CLI — npx @anoblescm/devcat sync. Pushes your AI tool manifest to devcat.dev. Manifest-only sync via RFC 8628 device authorization with OS keychain credentials.",
+  "description": "DevCat CLI — npx @devcat/cli sync. Pushes your AI tool manifest to devcat.dev. Manifest-only sync via RFC 8628 device authorization with OS keychain credentials.",
   "license": "MIT",
   "author": "Andrew Noble (https://github.com/AnobleSCM)",
   "repository": {

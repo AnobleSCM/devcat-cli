@@ -17,11 +17,11 @@ describe('mapErrorCode', () => {
     expect(mapErrorCode('token_invalid').exitCode).toBe(EXIT_AUTH_ERROR);
   });
 
-  it('expired_token -> exit 2 + "10 minutes" + "Run `npx @anoblescm/devcat sync` again"', () => {
+  it('expired_token -> exit 2 + "10 minutes" + "Run `npx @devcat/cli sync` again"', () => {
     const m = mapErrorCode('expired_token');
     expect(m.exitCode).toBe(EXIT_AUTH_ERROR);
     expect(m.message).toContain('10 minutes');
-    expect(m.message).toContain('Run `npx @anoblescm/devcat sync` again');
+    expect(m.message).toContain('Run `npx @devcat/cli sync` again');
   });
 
   it('access_denied -> exit 2 + canceled', () => {
