@@ -36,8 +36,14 @@ export class NetworkFailedError extends Error {
 export interface PostSyncOpts {
   apiBase?: string;
   accessToken: string;
+  idempotencyKey?: string;
+  emitStartEvent?: boolean;
   /** Accepts the manifest layer's ToolEntry shape (structural superset of API ToolEntry). */
   tools: ReadonlyArray<{ type: ToolType; name: string }>;
+}
+
+export function createSyncIdempotencyKey(): string {
+  return uuidv7();
 }
 
 /**
@@ -51,14 +57,16 @@ export interface PostSyncOpts {
  */
 export async function postSync(opts: PostSyncOpts): Promise<SyncResponseBody> {
   const apiBase = opts.apiBase ?? getApiBase();
-  const idempotencyKey = uuidv7();
+  const idempotencyKey = opts.idempotencyKey ?? createSyncIdempotencyKey();
   const body: SyncRequestBody = {
     manifest_hash: computeManifestHash(opts.tools),
     tools: opts.tools.map((t) => ({ type: t.type, name: t.name })),
   };
   const bodyJson = JSON.stringify(body);
 
-  emitEvent({ type: 'sync.start', tool_count: opts.tools.length, idempotency_key: idempotencyKey });
+  if (opts.emitStartEvent !== false) {
+    emitEvent({ type: 'sync.start', tool_count: opts.tools.length, idempotency_key: idempotencyKey });
+  }
 
   // Attempt 1
   try {

@@ -17,6 +17,7 @@ import {
 } from '../auth/deviceFlow.js';
 import { refreshAccessToken, RefreshTokenInvalidError } from '../auth/refresh.js';
 import {
+  createSyncIdempotencyKey,
   postSync,
   TokenInvalidError,
   SyncFailedError,
@@ -74,6 +75,8 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
     }
     return EXIT_OK;
   }
+  const idempotencyKey = createSyncIdempotencyKey();
+  emitEvent({ type: 'sync.start', tool_count: manifest.tools.length, idempotency_key: idempotencyKey });
 
   // 2. Ensure token
   let tokens: TokenPair;
@@ -93,6 +96,8 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
     const body = await postSync({
       accessToken: tokens.access_token,
       tools: manifest.tools,
+      idempotencyKey,
+      emitStartEvent: false,
     });
     if (isJsonMode()) {
       emitEvent({ type: 'sync.success', synced_at: body.synced_at, counts: body.counts });
@@ -103,7 +108,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
   } catch (err) {
     if (err instanceof TokenInvalidError) {
       // D-16 recovery
-      return await recoverFromTokenInvalid(tokens, manifest, opts);
+      return await recoverFromTokenInvalid(tokens, manifest, opts, idempotencyKey);
     }
     return handleSyncError(err);
   }
@@ -171,6 +176,7 @@ async function recoverFromTokenInvalid(
   tokens: TokenPair,
   manifest: DetectResult,
   opts: SyncOptions,
+  idempotencyKey: string,
 ): Promise<ExitCode> {
   let nextAccessToken: string;
   // 4a. Try refresh first
@@ -216,7 +222,12 @@ async function recoverFromTokenInvalid(
 
   // 4b. Retry sync once with new access token
   try {
-    const body = await postSync({ accessToken: nextAccessToken, tools: manifest.tools });
+    const body = await postSync({
+      accessToken: nextAccessToken,
+      tools: manifest.tools,
+      idempotencyKey,
+      emitStartEvent: false,
+    });
     if (isJsonMode()) {
       emitEvent({ type: 'sync.success', synced_at: body.synced_at, counts: body.counts });
     } else {
