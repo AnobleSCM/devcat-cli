@@ -263,7 +263,7 @@ describe('pollForToken', () => {
     const body = capturedBody as {
       client_metadata?: { cli_version?: string; hostname?: string; platform?: string };
     };
-    expect(body.client_metadata?.cli_version).toBe('0.1.0');
+    expect(body.client_metadata?.cli_version).toBe('0.1.1');
     expect(['darwin', 'linux', 'win32']).toContain(body.client_metadata?.platform);
     expect(typeof body.client_metadata?.hostname).toBe('string');
   });

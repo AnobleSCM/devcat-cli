@@ -20,7 +20,7 @@ describe('authenticatedFetch', () => {
       }),
     );
     await authenticatedFetch(`${API_BASE}/probe`);
-    expect(capturedUA).toMatch(/^devcat-cli\/0\.1\.0 \((darwin|linux|win32); node /);
+    expect(capturedUA).toMatch(/^devcat-cli\/0\.1\.1 \((darwin|linux|win32); node /);
   });
 
   it('sets Authorization: Bearer when bearerToken passed', async () => {
