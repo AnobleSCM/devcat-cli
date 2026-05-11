@@ -1,0 +1,100 @@
+# Claude Code PR review.
+# Runs on every PR open/update. Reads the diff and the repo's own context
+# docs (CLAUDE.md, AGENTS.md, DESIGN.md, PRODUCT.md, .impeccable/) as the
+# source of truth for what to flag. Posts findings as a PR comment with
+# severity P0-P3.
+#
+# Auth: uses CLAUDE_CODE_OAUTH_TOKEN secret (Claude Max subscription).
+# Auto-triggers because `prompt:` is provided (no @claude mention needed).
+
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '_bmad-output/**'
+      - 'HANDOFF_*.md'
+      - '**/*.lock'
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Claude PR review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request as a senior engineer who cares about
+            shipping safely.
+
+            Source of truth for what matters in this repo:
+            - CLAUDE.md (project conventions and policies)
+            - AGENTS.md (workspace rules)
+            - DESIGN.md (design constraints, if present)
+            - PRODUCT.md (product facts, pricing, positioning, if present)
+            - .impeccable/* (design gate context, if present)
+
+            Read those files before reviewing. Treat them as the authoritative
+            spec - when the diff conflicts with them, flag the diff.
+
+            Be specifically alert to:
+            - Compliance: guarantee language, marketing claims without
+              evidence, public vendor mentions that violate stated policy.
+            - Brand/voice drift: copy that softens niche positioning or
+              breaks the tone defined in the docs.
+            - Pricing/tier inconsistencies: numbers in copy must match the
+              canonical pricing wherever it lives in the repo.
+            - Deliverability risk: cold-email subject/body changes that
+              could hurt sender reputation.
+            - High-blast-radius changes: .github/workflows/ edits, secrets
+              in code, schema or RLS changes, auth/permissions.
+            - Cost runaway: agent loops without iteration caps, parallel
+              tool calls without budgets, unbounded retries.
+
+            Skip noise:
+            - Don't nit-pick style, formatting, or markdown layout.
+            - Don't comment on planning artifacts in _bmad-output/.
+            - Don't repeat the same finding multiple times - group by file.
+
+            Severity rubric:
+            - P0 (blocking): compliance violation, secret leak, broken
+              auto-merge config, security issue.
+            - P1 (fix before merge): factual error, missing citation,
+              copy that breaks a stated rule, regression risk.
+            - P2 (nice to fix): inconsistency, suggested improvement.
+            - P3 (FYI): observation, alternative approach.
+
+            Use `gh pr comment` to post a single top-level comment with
+            sections by severity (highest first), file/line references
+            where useful. If the PR is clean, post one sentence saying so.
+
+            Use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) only for specific line-level issues that
+            need to land on exact lines.
+
+            Only post GitHub comments — don't submit review text as
+            agent messages. If CLAUDE.md / AGENTS.md / etc. are absent,
+            review against general senior-engineer judgment and note
+            that absence.
+
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
