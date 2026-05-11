@@ -1,0 +1,12 @@
+name: agent-pr-gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+jobs:
+  gate:
+    uses: AnobleSCM/agent-shared-actions/.github/workflows/agent-pr-gate.yml@v2
+    secrets:
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+      CUBIC_API_KEY: ${{ secrets.CUBIC_API_KEY }}
