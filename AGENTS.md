@@ -1,42 +1,105 @@
 # AGENTS.md
 
-<!-- BEGIN CUBIC-DISCIPLINE-BLOCK v2.5 -->
-## Automated Review (Cubic + Gemini)
+<!-- BEGIN CUBIC-DISCIPLINE-BLOCK v2.6 -->
+## Automated PR Review (Cubic + Gemini) — REQUIRED workflow
 
-Every PR opened in this repo is automatically reviewed by two independent AI reviewers: **Cubic** (project-aware, MCP-callable) and **Gemini Code Assist** (GitHub-native). Both run on every PR — no manual trigger needed. The `agent-pr-gate@v2` workflow blocks auto-merge if either reviewer flags a P0 or P1, regardless of confidence.
+**THIS IS NOT OPTIONAL.** Every code change in this repo goes through the PR-based gate. Andrew is a non-developer and cannot review PRs himself. The Cubic + Gemini AI reviewers are the ONLY review. The PR-and-gate workflow exists so bad code never lands on main without an AI catch.
 
-**Branching policy:** Agents do not commit to main. Create a feature branch, push, open a draft PR, run `/cubic-self-check` (or the shell equivalent on non-Mac runtimes), mark ready when clean. The gate auto-merges. Andrew may commit directly to main when he explicitly says so ("commit directly" / "skip the PR").
+### The rule (no exceptions unless Andrew explicitly overrides)
 
-**Before starting work in this repo:**
-- Call `mcp__cubic__list_learnings` and read the project-specific patterns Cubic has accumulated. These are real issues found in past PRs.
-- For architecture questions, query Cubic's auto-generated wiki via `mcp__cubic__list_wiki_pages` / `mcp__cubic__get_wiki_page` — it updates as code changes.
+**NEVER push commits directly to `main`.** Always work on a feature branch, open a draft PR, run `/cubic-self-check`, mark ready, let the gate auto-merge. Direct commits to main are forbidden unless Andrew says verbatim "commit directly" or "skip the PR" — and even then, only for that single task.
 
-**After pushing a draft PR:**
-1. Run `/cubic-self-check` (in Claude Code / Codex / Hermes) or the shell script directly (in opencode / Cowork / Bunk):
+### Branch hygiene (do this every time)
+
+**Before starting any task:**
+```bash
+git checkout main
+git pull
+git checkout -b <descriptive-branch-name>
+```
+Your branch must be fresh-from-`origin/main`. Stale branches cause merge conflicts that you'll have to rebase later.
+
+**If you get a "PR is stale" or "needs rebase" warning** (because another PR merged while you were working):
+```bash
+git fetch origin
+git rebase origin/main
+git push --force-with-lease
+```
+The gate will re-run automatically after the force-push.
+
+**After your PR merges:**
+```bash
+git checkout main
+git pull
+git branch -D <your-merged-branch>     # clean up local
+# If you used a worktree: rm -rf <worktree-path>; git worktree prune
+```
+
+### The full PR loop (after you have changes to commit)
+
+1. Commit your changes locally on your feature branch.
+2. Push: `git push -u origin <branch-name>`
+3. Open a **draft** PR: `gh pr create --draft --title "..." --body "..."`
+4. Run `/cubic-self-check` (in Claude Code / Codex / Hermes) or the shell script directly:
    ```bash
    cubic-self-check --pr <num> --repo AnobleSCM/<name> --runtime <your-runtime> --current-iter 1
    ```
-2. Read the JSON signal on stdout:
-   - `signal: clean` → mark PR ready (`gh pr ready <num>`). The gate auto-merges.
-   - `signal: must-fix` → fix the listed P0/P1 findings, commit, push, then re-run with `--current-iter $((N+1))`.
-   - `signal: escalate` → budget exhausted; an escalation file was written. Stop the loop. Do not mark PR ready.
-3. The caller (YOU) tracks `--current-iter`. The script does NOT auto-increment.
-4. Cap is 3 self-iterations (`--max-iter 3` default). After exhaustion, Plan 3's Paperclip cron handler triggers a Cubic background-agent fix or emails Andrew.
+   It returns a JSON signal on stdout. Cap is 3 self-iterations.
+5. Read the JSON signal:
+   - **`signal: clean`** → mark PR ready (`gh pr ready <num>`). The hook only allows this if the clean state was recorded by step 4.
+   - **`signal: must-fix`** → read the `findings` array, apply fixes to the code, commit, push, re-run step 4 with `--current-iter $((N+1))`.
+   - **`signal: escalate`** → budget exhausted; an escalation file was written. Do NOT mark PR ready. The PR sits open until handled.
+6. After marking the PR ready, the gate runs server-side (~2 min). **YOU MUST WATCH THE GATE.** Don't end your session until the PR has reached a terminal state:
+   ```bash
+   cubic-self-check --pr <num> --repo AnobleSCM/<name> --runtime <your-runtime> --current-iter <N+1> --watch
+   ```
+   `--watch` polls the gate checks via `gh pr checks`. It exits clean once the gate passes and the PR merges, or returns must-fix if the gate failed (with the failure details). You then loop back to step 5.
 
-**Severity ladder (P0/P1 block; P2/P3 advisory):**
+### What "do NOT push to main" means in practice
 
-| Severity | Cubic signal | Gemini signal | Behavior |
-|---|---|---|---|
-| **P0** | `P0:` body prefix; OR severity≥8 in `security_privacy` / `bugs_logic` | `security-critical` or `security-high` badge | Hard block. Must fix. |
-| **P1** | `P1:` body prefix; OR severity 5-7 | `high-priority` badge | Hard block. Must fix. |
-| **P2** | severity≥8 in non-blocking category | `medium-priority` badge | Soft. Fix if trivial; reply with reasoning otherwise. |
-| **P3** | severity 1-4 | `low-priority` or unrecognized | Log only. |
+- `git push origin main` — forbidden.
+- `git push` while on `main` branch — forbidden.
+- Direct merge to main via `gh pr merge --merge` (non-squash, non-auto) — forbidden unless Andrew explicitly overrides.
 
-**Exit codes:** `0` for normal signal; `2` for system error (Cubic unreachable, gh failure, malformed response — a system-error JSON envelope is on stderr); `3` for auth error (Cubic key revoked or missing — run `~/Developer/scripts/cubic-rotate-key.sh` to rotate).
+### CRITICAL: the caller tracks `--current-iter`
 
-**Full design:** `~/workspace-wiki/wiki/architecture/cubic-gemini-pr-stack.md` (v2.5).
-**Empirical API findings:** `~/Developer/scripts/CUBIC_API_NOTES.md`.
-<!-- END CUBIC-DISCIPLINE-BLOCK v2.5 -->
+The script does NOT auto-increment. YOU must pass `--current-iter N` on each invocation, incrementing N between calls on the same PR. Default is 1. The script enforces `--current-iter <= --max-iter` (default 3) at parse-time. If you forget to increment, the script will block you with a clear error.
+
+### Severity reference
+
+| Severity | Source signal | Behavior |
+|---|---|---|
+| **P0** | Cubic `P0:` body prefix; OR severity≥8 in `security_privacy` / `bugs_logic` / Gemini security-critical or security-high badge | Hard block. Must fix. |
+| **P1** | Cubic `P1:` body prefix; OR severity 5-7; Gemini high-priority badge | Hard block. Must fix. |
+| **P2** | Cubic severity≥8 in non-blocking category; Gemini medium-priority badge | Soft. Fix if trivial; reply with reasoning otherwise. Not in blocking findings. |
+| **P3** | Cubic severity 1-4; Gemini low-priority or unrecognized | Log only. |
+
+### Protected paths (never auto-merge — manual approval required)
+
+If your PR touches any of these, the policy gate blocks auto-merge and the PR stays open until Andrew manually merges:
+- `.github/workflows/*` (CI)
+- `.env*`, `**/secrets/**` (secrets)
+- `*.entitlements`, `Provisioning*` (iOS signing)
+- `*-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`, `Gemfile.lock`, `Pipfile.lock` (supply chain)
+- `**/migrations/**` (database schema)
+- `**/auth/**`, `**/billing/**`, `**/payment*` (high-blast-radius code)
+- `**/deploy/**` (deployment config)
+
+If your task TOUCHES one of these, that's a flag to slow down and tell Andrew before pushing.
+
+### Exit codes
+
+- `0` — normal signal returned on stdout. Read the signal field.
+- `2` — system error: Cubic MCP unreachable, gh CLI failure, malformed response. Stop the loop. A JSON error envelope is on stderr.
+- `3` — auth error: Cubic returned HTTP 401/403, or `CUBIC_API_KEY` is missing. Stop and tell Andrew to run `~/Developer/scripts/cubic-rotate-key.sh`.
+
+### Full design + operating guide
+
+- Architecture: `~/workspace-wiki/wiki/architecture/cubic-gemini-pr-stack.md`
+- Operating guide: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.md`
+- Visual flowchart: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.html` (open in browser)
+- Empirical API findings: `~/Developer/scripts/CUBIC_API_NOTES.md`
+<!-- END CUBIC-DISCIPLINE-BLOCK v2.6 -->
 
 
 ## Project Contract
