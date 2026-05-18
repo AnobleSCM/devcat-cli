@@ -1,13 +1,15 @@
 # AGENTS.md
 
-<!-- BEGIN CUBIC-DISCIPLINE-BLOCK v2.6 -->
-## Automated PR Review (Cubic + Gemini) — REQUIRED workflow
+<!-- BEGIN CUBIC-DISCIPLINE-BLOCK v2.7 -->
+## Automated PR Review (Cubic required, Gemini advisory) — REQUIRED workflow
 
-**THIS IS NOT OPTIONAL.** Every code change in this repo goes through the PR-based gate. Andrew is a non-developer and cannot review PRs himself. The Cubic + Gemini AI reviewers are the ONLY review. The PR-and-gate workflow exists so bad code never lands on main without an AI catch.
+**THIS IS NOT OPTIONAL.** Every code change in this repo goes through the PR-based gate. Andrew is a non-developer and cannot review PRs himself. Cubic is the required AI reviewer; Gemini is advisory when available. The PR-and-gate workflow exists so bad code never lands on main without an AI catch.
 
 ### The rule (no exceptions unless Andrew explicitly overrides)
 
-**NEVER push commits directly to `main`.** Always work on a feature branch, open a draft PR, run `/cubic-self-check`, mark ready, let the gate auto-merge. Direct commits to main are forbidden unless Andrew says verbatim "commit directly" or "skip the PR" — and even then, only for that single task.
+**NEVER push commits directly to `main`.** Always work on a feature branch, open a draft PR to register the work, run `/cubic-self-check`, submit the PR by marking it ready only after a clean signal, and let the gate auto-merge. Direct commits to main are forbidden unless Andrew says verbatim "commit directly" or "skip the PR" — and even then, only for that single task.
+
+Draft PR creation is registration, not review submission. "Submit the PR" means `gh pr ready`; Cubic self-check is mandatory before that ready/submitted state. The PreToolUse hook at `~/.claude/hooks/cubic-self-check-gate.sh` enforces this for Claude Code; Codex / Hermes / Bunk runtimes self-enforce by following this rule.
 
 ### Branch hygiene (do this every time)
 
@@ -39,14 +41,14 @@ git branch -D <your-merged-branch>     # clean up local
 
 1. Commit your changes locally on your feature branch.
 2. Push: `git push -u origin <branch-name>`
-3. Open a **draft** PR: `gh pr create --draft --title "..." --body "..."`
+3. Open a **draft** PR to register the work: `gh pr create --draft --title "..." --body "..."`
 4. Run `/cubic-self-check` (in Claude Code / Codex / Hermes) or the shell script directly:
    ```bash
    cubic-self-check --pr <num> --repo AnobleSCM/<name> --runtime <your-runtime> --current-iter 1
    ```
    It returns a JSON signal on stdout. Cap is 3 self-iterations.
 5. Read the JSON signal:
-   - **`signal: clean`** → mark PR ready (`gh pr ready <num>`). The hook only allows this if the clean state was recorded by step 4.
+   - **`signal: clean`** → submit the PR by marking it ready (`gh pr ready <num>`). The hook only allows this if the clean state was recorded by step 4.
    - **`signal: must-fix`** → read the `findings` array, apply fixes to the code, commit, push, re-run step 4 with `--current-iter $((N+1))`.
    - **`signal: escalate`** → budget exhausted; an escalation file was written. Do NOT mark PR ready. The PR sits open until handled.
 6. After marking the PR ready, the gate runs server-side (~2 min). **YOU MUST WATCH THE GATE.** Don't end your session until the PR has reached a terminal state:
@@ -69,9 +71,9 @@ The script does NOT auto-increment. YOU must pass `--current-iter N` on each inv
 
 | Severity | Source signal | Behavior |
 |---|---|---|
-| **P0** | Cubic `P0:` body prefix; OR severity≥8 in `security_privacy` / `bugs_logic` / Gemini security-critical or security-high badge | Hard block. Must fix. |
-| **P1** | Cubic `P1:` body prefix; OR severity 5-7; Gemini high-priority badge | Hard block. Must fix. |
-| **P2** | Cubic severity≥8 in non-blocking category; Gemini medium-priority badge | Soft. Fix if trivial; reply with reasoning otherwise. Not in blocking findings. |
+| **P0** | Cubic `P0:` body prefix; OR severity≥8 in `security_privacy` / `bugs_logic` | Hard block. Must fix. Gemini security-critical/security-high is advisory warning only. |
+| **P1** | Cubic `P1:` body prefix; OR Cubic severity 5-7 | Hard block. Must fix. Gemini high-priority is advisory warning only. |
+| **P2** | Cubic severity≥8 in non-blocking category | Soft. Fix if trivial; reply with reasoning otherwise. Gemini medium-priority is advisory only. |
 | **P3** | Cubic severity 1-4; Gemini low-priority or unrecognized | Log only. |
 
 ### Protected paths (never auto-merge — manual approval required)
@@ -99,7 +101,9 @@ If your task TOUCHES one of these, that's a flag to slow down and tell Andrew be
 - Operating guide: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.md`
 - Visual flowchart: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.html` (open in browser)
 - Empirical API findings: `~/Developer/scripts/CUBIC_API_NOTES.md`
-<!-- END CUBIC-DISCIPLINE-BLOCK v2.6 -->
+<!-- END CUBIC-DISCIPLINE-BLOCK v2.7 -->
+
+
 
 
 ## Project Contract
