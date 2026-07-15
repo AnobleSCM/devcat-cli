@@ -1,105 +1,30 @@
 # AGENTS.md
 
-<!-- BEGIN CUBIC-DISCIPLINE-BLOCK v2.6 -->
-## Automated PR Review (Cubic + Gemini) — REQUIRED workflow
+<!-- BEGIN SIGNED-REVIEW-DISCIPLINE-BLOCK v1 -->
+## Automated PR Review — required
 
-**THIS IS NOT OPTIONAL.** Every code change in this repo goes through the PR-based gate. Andrew is a non-developer and cannot review PRs himself. The Cubic + Gemini AI reviewers are the ONLY review. The PR-and-gate workflow exists so bad code never lands on main without an AI catch.
+Every repo change uses the signed exact-head review lane unless Andrew explicitly says `commit directly` or `skip the PR` for that one task. Never push directly to `main`. A draft PR registers work; marking it ready submits it for merge.
 
-### The rule (no exceptions unless Andrew explicitly overrides)
+### Required loop
 
-**NEVER push commits directly to `main`.** Always work on a feature branch, open a draft PR, run `/cubic-self-check`, mark ready, let the gate auto-merge. Direct commits to main are forbidden unless Andrew says verbatim "commit directly" or "skip the PR" — and even then, only for that single task.
+1. Start from fresh `origin/main` on a feature branch.
+2. Run focused tests, relevant full verification, and `git diff --check`.
+3. Commit and push the branch, then open a draft PR.
+4. Run `review-self-check --pr <num> --repo AnobleSCM/<name> --runtime <runtime> --current-iter 1`.
+5. Fix every P0/P1 or `must-fix` finding, push the new head, increment `--current-iter`, and rerun. Never reuse a clean signal after a push.
+6. Mark ready only after `signal: clean` for the exact current head.
+7. Run `review-self-check --pr <num> --repo AnobleSCM/<name> --runtime <runtime> --current-iter <next> --watch` and wait for a terminal gate result.
 
-### Branch hygiene (do this every time)
+P0/P1 findings block merge. P2/P3 findings are advisory unless they reveal a concrete safety, correctness, privacy, or data-loss risk. `reviewers-unavailable` is an infrastructure condition, not permission to skip review; retry the signed fallback lane or use the approved provider failover.
 
-**Before starting any task:**
-```bash
-git checkout main
-git pull
-git checkout -b <descriptive-branch-name>
-```
-Your branch must be fresh-from-`origin/main`. Stale branches cause merge conflicts that you'll have to rebase later.
+### Protected paths
 
-**If you get a "PR is stale" or "needs rebase" warning** (because another PR merged while you were working):
-```bash
-git fetch origin
-git rebase origin/main
-git push --force-with-lease
-```
-The gate will re-run automatically after the force-push.
+Changes to workflows, secrets or environment handling, signing material, dependency manifests or lockfiles, migrations, auth, billing or payments, deployment, rulesets, fleet rollout, hosted runtime, or credential mutation require two independent non-author AI reviewer families, exact-head signed protected-path receipts, and an honest AI-authorization note before merge. Never claim human review that did not occur.
 
-**After your PR merges:**
-```bash
-git checkout main
-git pull
-git branch -D <your-merged-branch>     # clean up local
-# If you used a worktree: rm -rf <worktree-path>; git worktree prune
-```
+### Continuity
 
-### The full PR loop (after you have changes to commit)
-
-1. Commit your changes locally on your feature branch.
-2. Push: `git push -u origin <branch-name>`
-3. Open a **draft** PR: `gh pr create --draft --title "..." --body "..."`
-4. Run `/cubic-self-check` (in Claude Code / Codex / Hermes) or the shell script directly:
-   ```bash
-   cubic-self-check --pr <num> --repo AnobleSCM/<name> --runtime <your-runtime> --current-iter 1
-   ```
-   It returns a JSON signal on stdout. Cap is 3 self-iterations.
-5. Read the JSON signal:
-   - **`signal: clean`** → mark PR ready (`gh pr ready <num>`). The hook only allows this if the clean state was recorded by step 4.
-   - **`signal: must-fix`** → read the `findings` array, apply fixes to the code, commit, push, re-run step 4 with `--current-iter $((N+1))`.
-   - **`signal: escalate`** → budget exhausted; an escalation file was written. Do NOT mark PR ready. The PR sits open until handled.
-6. After marking the PR ready, the gate runs server-side (~2 min). **YOU MUST WATCH THE GATE.** Don't end your session until the PR has reached a terminal state:
-   ```bash
-   cubic-self-check --pr <num> --repo AnobleSCM/<name> --runtime <your-runtime> --current-iter <N+1> --watch
-   ```
-   `--watch` polls the gate checks via `gh pr checks`. It exits clean once the gate passes and the PR merges, or returns must-fix if the gate failed (with the failure details). You then loop back to step 5.
-
-### What "do NOT push to main" means in practice
-
-- `git push origin main` — forbidden.
-- `git push` while on `main` branch — forbidden.
-- Direct merge to main via `gh pr merge --merge` (non-squash, non-auto) — forbidden unless Andrew explicitly overrides.
-
-### CRITICAL: the caller tracks `--current-iter`
-
-The script does NOT auto-increment. YOU must pass `--current-iter N` on each invocation, incrementing N between calls on the same PR. Default is 1. The script enforces `--current-iter <= --max-iter` (default 3) at parse-time. If you forget to increment, the script will block you with a clear error.
-
-### Severity reference
-
-| Severity | Source signal | Behavior |
-|---|---|---|
-| **P0** | Cubic `P0:` body prefix; OR severity≥8 in `security_privacy` / `bugs_logic` / Gemini security-critical or security-high badge | Hard block. Must fix. |
-| **P1** | Cubic `P1:` body prefix; OR severity 5-7; Gemini high-priority badge | Hard block. Must fix. |
-| **P2** | Cubic severity≥8 in non-blocking category; Gemini medium-priority badge | Soft. Fix if trivial; reply with reasoning otherwise. Not in blocking findings. |
-| **P3** | Cubic severity 1-4; Gemini low-priority or unrecognized | Log only. |
-
-### Protected paths (never auto-merge — manual approval required)
-
-If your PR touches any of these, the policy gate blocks auto-merge and the PR stays open until Andrew manually merges:
-- `.github/workflows/*` (CI)
-- `.env*`, `**/secrets/**` (secrets)
-- `*.entitlements`, `Provisioning*` (iOS signing)
-- `*-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`, `Gemfile.lock`, `Pipfile.lock` (supply chain)
-- `**/migrations/**` (database schema)
-- `**/auth/**`, `**/billing/**`, `**/payment*` (high-blast-radius code)
-- `**/deploy/**` (deployment config)
-
-If your task TOUCHES one of these, that's a flag to slow down and tell Andrew before pushing.
-
-### Exit codes
-
-- `0` — normal signal returned on stdout. Read the signal field.
-- `2` — system error: Cubic MCP unreachable, gh CLI failure, malformed response. Stop the loop. A JSON error envelope is on stderr.
-- `3` — auth error: Cubic returned HTTP 401/403, or `CUBIC_API_KEY` is missing. Stop and tell Andrew to run `~/Developer/scripts/cubic-rotate-key.sh`.
-
-### Full design + operating guide
-
-- Architecture: `~/workspace-wiki/wiki/architecture/cubic-gemini-pr-stack.md`
-- Operating guide: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.md`
-- Visual flowchart: `~/workspace-wiki/wiki/playbooks/cubic-pr-workflow.html` (open in browser)
-- Empirical API findings: `~/Developer/scripts/CUBIC_API_NOTES.md`
-<!-- END CUBIC-DISCIPLINE-BLOCK v2.6 -->
+The reusable GitHub gate validates the signed exact-head fallback receipt. Gemini may be advisory but is not sufficient by itself. External reviewer pauses do not waive the gate, and Andrew is not asked to review or merge code.
+<!-- END SIGNED-REVIEW-DISCIPLINE-BLOCK v1 -->
 
 
 ## Project Contract
