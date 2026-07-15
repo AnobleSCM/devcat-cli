@@ -10,9 +10,8 @@ permissions:
 
 jobs:
   gate:
-    # Pinned callee contract at c9f885f:
+    # Secret schema proof (lines 40-42): https://github.com/AnobleSCM/agent-shared-actions/blob/c9f885fafa3ba6f95fa9075a38d331b02c311a55/.github/workflows/agent-pr-gate.yml#L40-L42
     #   on.workflow_call.secrets.APP_PRIVATE_KEY.required: true
-    #   on.workflow_call.secrets has no other entries
     uses: AnobleSCM/agent-shared-actions/.github/workflows/agent-pr-gate.yml@c9f885fafa3ba6f95fa9075a38d331b02c311a55
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
