@@ -10,8 +10,7 @@ permissions:
 
 jobs:
   gate:
-    uses: AnobleSCM/agent-shared-actions/.github/workflows/agent-pr-gate.yml@v2
+    # v4 accepts APP_PRIVATE_KEY only; signed exact-head review replaced the retired vendor key.
+    uses: AnobleSCM/agent-shared-actions/.github/workflows/agent-pr-gate.yml@v4
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
-      CUBIC_API_KEY: ${{ secrets.CUBIC_API_KEY }}
-
