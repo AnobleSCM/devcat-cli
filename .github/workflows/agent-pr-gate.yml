@@ -11,6 +11,7 @@ permissions:
 jobs:
   gate:
     # v4 accepts APP_PRIVATE_KEY only; signed exact-head review replaced the retired vendor key.
+    # v4 is the fleet-controlled release alias mandated for caller stubs by agent-shared-actions.
     uses: AnobleSCM/agent-shared-actions/.github/workflows/agent-pr-gate.yml@v4
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
