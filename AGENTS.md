@@ -5,7 +5,7 @@
 
 Every repository change uses the signed exact-head review lane unless Andrew explicitly says `commit directly` or `skip the PR` for that one task. Never push directly to `main`. A draft PR registers work; marking it ready submits it for merge.
 
-The installed `review-self-check` wrapper invokes independent fallback reviewers, records a signed receipt bound to the repository, PR number, and exact head SHA, and reports one of `clean`, `must-fix`, `escalate`, or `reviewers-unavailable`. Only `clean` for the current head permits readiness. The installed pre-merge hook enforces the same contract; do not disable or bypass it.
+The installed `review-self-check` wrapper invokes independent fallback reviewers, records a signed receipt bound to the repository, PR number, and exact head SHA, and reports one of `clean`, `must-fix`, `escalate`, or `reviewers-unavailable`. Only `clean` for the current head permits readiness. Exit code `0` means a normal JSON signal was returned and the signal still must be read; exit code `2` means a provider, GitHub, transport, or parsing system error; exit code `3` means an authentication error. Codes `2` and `3` stop the loop. The installed pre-merge hook enforces the same contract; do not disable or bypass it.
 
 ### Branch hygiene
 
@@ -31,7 +31,7 @@ P0/P1 findings block merge. P2/P3 findings are advisory unless they reveal a con
 
 ### Protected paths
 
-Changes to any of the following require exact-head signed coverage from at least two distinct substantive non-author AI reviewer families plus an honest AI-authorization note before merge:
+Changes to any of the following require exact-head signed coverage from at least two distinct substantive non-author AI reviewer families plus an honest AI-authorization note before merge. A reviewer family is the signed provider/runtime identity in the receipt: the author runtime is excluded, and duplicate identities do not count twice:
 
 - `.github/workflows/**`, merge rules, auto-approve logic, and rulesets;
 - `.env*`, `**/secrets/**`, credentials, signing material, and runtime configuration;
@@ -44,7 +44,7 @@ Never claim human review that did not occur. Andrew is not asked to review, appr
 
 ### Continuity
 
-The reusable GitHub gate validates the signed exact-head fallback receipt and protected-path quorum. Advisory reviewers may add signal but cannot satisfy the gate alone. External reviewer pauses do not waive the signed fallback requirement, and a self-review by the author runtime is never sufficient.
+Because this repository is public, `.github/workflows/agent-pr-gate.yml` vendors the v4 gate locally and pins its helper checkout to source commit `c9f885fafa3ba6f95fa9075a38d331b02c311a55`. That workflow validates the signed exact-head fallback receipt and protected-path quorum. Advisory reviewers may add signal but cannot satisfy the gate alone. External reviewer pauses do not waive the signed fallback requirement, and a self-review by the author runtime is never sufficient.
 <!-- END SIGNED-REVIEW-DISCIPLINE-BLOCK v2 -->
 
 
