@@ -1,0 +1,19 @@
+AGENTS.md
+  s_bec424ab3222ae::t_609d3a99c961ac 3,5-8,10-14,16-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ee6676d7b7f945d8473376b8037e89b389bdf986",
+  "prompts": {},
+  "sessions": {
+    "s_bec424ab3222ae": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9f02-dde9-7e01-ae21-7f4bdc426e10",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
