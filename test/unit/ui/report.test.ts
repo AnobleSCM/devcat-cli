@@ -70,7 +70,7 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     expect(out).toContain('Cursor');
     expect(out).toContain('atelier-board, context7');
     expect(out).toContain('swift-lsp');
-    expect(out).toContain('7 tools in Claude Code, Codex, and Cursor · 4 config files checked');
+    expect(out).toContain('7 tools in Claude Code, Codex, and Cursor · 4 locations checked');
   });
 
   it('shows a per-type count next to each type label', () => {
@@ -114,7 +114,7 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     const one: DetectResult = { tools: [tool({ name: 'solo' })], pathsScanned: ['~/.claude.json'] };
     const out = renderStackReport(one);
     expect(out).toContain('Your AI-coding stack — 1 tool');
-    expect(out).toContain('1 tool in Claude Code · 1 config file checked');
+    expect(out).toContain('1 tool in Claude Code · 1 location checked');
   });
 
   it('empty scan: names the paths it checked instead of printing an empty stack', () => {
@@ -159,6 +159,49 @@ describe('renderStackMarkdown (--markdown)', () => {
     const out = renderStackMarkdown({ tools: [], pathsScanned: ['~/.claude.json'] });
     expect(out).toContain('## My AI stack');
     expect(out).toContain('No AI tooling detected on this machine yet.');
+  });
+});
+
+describe('name sanitization', () => {
+  // Config keys and folder names can legally hold control characters. A name
+  // carrying an ANSI sequence would otherwise repaint the terminal report.
+  const HOSTILE = '\u001b[31mred\u001b[0m\nfake-line\ttab';
+  const SANITIZED = '[31mred[0mfake-linetab';
+  // Every control character EXCEPT \n, which the report legitimately uses
+  // to separate its own lines. Tab and ESC must not survive.
+  // eslint-disable-next-line no-control-regex
+  const CONTROL_CHARS = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/;
+
+  const hostile: DetectResult = {
+    tools: [tool({ name: HOSTILE }), tool({ name: 'back`tick', type: 'skill' })],
+    pathsScanned: ['~/.claude.json'],
+  };
+
+  it('strips control characters from the terminal report', () => {
+    const out = renderStackReport(hostile);
+    expect(out).not.toMatch(CONTROL_CHARS);
+    expect(out).toContain(SANITIZED);
+  });
+
+  it('strips control characters and backticks from markdown', () => {
+    const out = renderStackMarkdown(hostile);
+    expect(out).not.toMatch(CONTROL_CHARS);
+    expect(out).toContain(SANITIZED);
+    // The backtick would otherwise break out of the inline code span.
+    expect(out).toContain('`backtick`');
+  });
+
+  it('leaves ordinary names untouched', () => {
+    expect(renderStackReport(MIXED)).toContain('atelier-board, context7');
+    expect(renderStackMarkdown(MIXED)).toContain('`swift-lsp`');
+  });
+
+  it('needs no sanitizing in JSON - stringify escapes control characters', () => {
+    const parsed = JSON.parse(renderStackJson(hostile));
+    const names = parsed.clients.flatMap((c: { types: { names: string[] }[] }) =>
+      c.types.flatMap((t) => t.names),
+    );
+    expect(names).toContain(HOSTILE);
   });
 });
 

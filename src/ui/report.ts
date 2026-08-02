@@ -56,6 +56,25 @@ export interface StackGroup {
 }
 
 /**
+ * Names come from config keys and folder names, both of which can legally
+ * contain control characters, ANSI escapes, and newlines. Rendering those
+ * straight into a terminal lets a directory name repaint the report; the
+ * JSON path is already safe because JSON.stringify escapes them.
+ *
+ * Control characters are dropped for every text rendering. Backticks are
+ * additionally dropped in markdown, where they would break out of the inline
+ * code span the name is wrapped in.
+ */
+function sanitizeName(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+}
+
+function sanitizeMarkdownName(name: string): string {
+  return sanitizeName(name).replace(/`/g, '');
+}
+
+/**
  * Group detected tools by client, then by type, with names sorted
  * alphabetically. Clients and types with nothing in them are omitted.
  */
@@ -86,8 +105,8 @@ export function groupStack(tools: readonly ToolEntry[]): StackGroup[] {
  *      12 mcp      alpha, beta, gamma, …
  *       4 plugin   swift-lsp, vercel
  *
- *   21 tools in Claude Code, Codex, and Cursor · 8 config files scanned
- *   3 project-scoped (this directory), 18 user-wide
+ *   21 tools in Claude Code, Codex, and Cursor · 8 locations checked
+ *   3 project-scoped · 18 user-wide
  */
 export function renderStackReport(result: DetectResult): string {
   if (result.tools.length === 0) return renderEmptyStack(result.pathsScanned);
@@ -103,7 +122,7 @@ export function renderStackReport(result: DetectResult): string {
     lines.push(`${c.bold(group.label)} ${c.dim(`· ${plural(group.total, 'tool')}`)}`);
     for (const { type, names } of group.byType) {
       const prefix = `  ${String(names.length).padStart(3)} ${type.padEnd(TYPE_WIDTH)}`;
-      const wrapped = wrap(names.join(', '), WRAP_WIDTH - NAME_COLUMN);
+      const wrapped = wrap(names.map(sanitizeName).join(', '), WRAP_WIDTH - NAME_COLUMN);
       lines.push(`${prefix}${wrapped[0]}`);
       for (const cont of wrapped.slice(1)) {
         lines.push(`${' '.repeat(NAME_COLUMN)}${cont}`);
@@ -112,11 +131,13 @@ export function renderStackReport(result: DetectResult): string {
   }
 
   const clientLabels = groups.map((g) => g.label);
-  const files = result.pathsScanned.length;
+  // pathsScanned holds directories (skills, agents) as well as files, so
+  // "locations" rather than "config files".
+  const locations = result.pathsScanned.length;
   lines.push('');
   lines.push(
     c.dim(
-      `${plural(total, 'tool')} in ${joinWithAnd(clientLabels)} · ${plural(files, 'config file')} checked`,
+      `${plural(total, 'tool')} in ${joinWithAnd(clientLabels)} · ${plural(locations, 'location')} checked`,
     ),
   );
 
@@ -153,7 +174,7 @@ export function renderStackMarkdown(result: DetectResult): string {
     lines.push('');
     lines.push(`### ${group.label}`);
     for (const { type, names } of group.byType) {
-      const rendered = names.map((n) => `\`${n}\``).join(', ');
+      const rendered = names.map((n) => `\`${sanitizeMarkdownName(n)}\``).join(', ');
       lines.push(`- **${TYPE_LABEL_MARKDOWN[type]} (${names.length}):** ${rendered}`);
     }
   }
