@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   program
     .name('devcat')
     .description(
-      'DevCat CLI — see your whole AI-coding stack in one command. Scans this machine for the MCP servers and plugins installed across Claude Code, Codex, and Cursor.',
+      'DevCat CLI — see your whole AI-coding stack in one command. Scans this machine for the MCP servers, plugins, skills, and subagents installed across Claude Code, Codex, and Cursor.',
     )
     .version(CLI_VERSION);
 
@@ -25,6 +25,7 @@ async function main(): Promise<void> {
     .command('report', { isDefault: true })
     .description('Scan this machine and print your AI-coding stack (default)')
     .option('--markdown', 'emit a shareable "My AI stack" markdown snippet')
+    .option('--json', 'emit the scan as one machine-readable JSON object (wins over --markdown)')
     .action(async (options: { markdown?: boolean }) => {
       const exitCode = await runReport({ markdown: options.markdown === true });
       process.exit(exitCode);

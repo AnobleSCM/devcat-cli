@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { groupStack, renderStackReport, renderStackMarkdown } from '../../../src/ui/report.js';
+import {
+  groupStack,
+  renderStackReport,
+  renderStackMarkdown,
+  renderStackJson,
+} from '../../../src/ui/report.js';
 import type { DetectResult, ToolEntry } from '../../../src/manifest/index.js';
 
 // Vitest fork pools leave process.stdout.isTTY undefined so colors auto-strip;
@@ -21,6 +26,8 @@ const MIXED: DetectResult = {
     tool({ name: 'context7' }),
     tool({ name: 'atelier-board' }),
     tool({ name: 'swift-lsp', type: 'plugin' }),
+    tool({ name: 'deep-research', type: 'skill' }),
+    tool({ name: 'code-reviewer', type: 'subagent' }),
     tool({ name: 'supabase', client: 'cursor', scope: 'project' }),
     tool({ name: 'serena', client: 'codex' }),
   ],
@@ -32,10 +39,13 @@ describe('groupStack', () => {
     const groups = groupStack(MIXED.tools);
     expect(groups.map((g) => g.client)).toEqual(['claude-code', 'codex', 'cursor']);
     expect(groups[0]!.label).toBe('Claude Code');
-    expect(groups[0]!.total).toBe(3);
+    expect(groups[0]!.total).toBe(5);
+    // Type order is fixed: mcp, plugin, skill, subagent.
     expect(groups[0]!.byType).toEqual([
       { type: 'mcp', names: ['atelier-board', 'context7'] },
       { type: 'plugin', names: ['swift-lsp'] },
+      { type: 'skill', names: ['deep-research'] },
+      { type: 'subagent', names: ['code-reviewer'] },
     ]);
   });
 
@@ -54,23 +64,26 @@ describe('groupStack', () => {
 describe('renderStackReport (default `npx devcat-cli` output)', () => {
   it('prints a header, a section per client, and a totals footer', () => {
     const out = renderStackReport(MIXED);
-    expect(out).toContain('Your AI-coding stack — 5 tools');
+    expect(out).toContain('Your AI-coding stack — 7 tools');
     expect(out).toContain('Claude Code');
     expect(out).toContain('Codex');
     expect(out).toContain('Cursor');
     expect(out).toContain('atelier-board, context7');
     expect(out).toContain('swift-lsp');
-    expect(out).toContain('5 tools in Claude Code, Codex, and Cursor · 4 config files checked');
+    expect(out).toContain('7 tools in Claude Code, Codex, and Cursor · 4 config files checked');
   });
 
   it('shows a per-type count next to each type label', () => {
     const out = renderStackReport(MIXED);
     expect(out).toMatch(/2 mcp\s+atelier-board, context7/);
     expect(out).toMatch(/1 plugin\s+swift-lsp/);
+    expect(out).toMatch(/1 skill\s+deep-research/);
+    // 'subagent' is exactly as wide as the type column, so it still needs a gap.
+    expect(out).toMatch(/1 subagent\s+code-reviewer/);
   });
 
   it('reports the project-scoped split only when something is project-scoped', () => {
-    expect(renderStackReport(MIXED)).toContain('1 project-scoped · 4 user-wide');
+    expect(renderStackReport(MIXED)).toContain('1 project-scoped · 6 user-wide');
 
     const userOnly: DetectResult = {
       tools: [tool({ name: 'a' })],
@@ -88,8 +101,11 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     const nameLines = lines.filter((l) => l.includes('mcp-server-number-'));
     expect(nameLines.length).toBeGreaterThan(1);
     for (const line of nameLines) expect(line.length).toBeLessThanOrEqual(78);
-    // Every wrapped line after the first starts at the name column.
-    for (const line of nameLines.slice(1)) expect(line.startsWith(' '.repeat(14))).toBe(true);
+    // Every wrapped line after the first starts exactly at the name column.
+    for (const line of nameLines.slice(1)) {
+      expect(line.startsWith(' '.repeat(15))).toBe(true);
+      expect(line[15]).not.toBe(' ');
+    }
     // Wrapping must not drop or duplicate entries.
     expect(nameLines.join(' ').match(/mcp-server-number-/g)).toHaveLength(20);
   });
@@ -114,10 +130,12 @@ describe('renderStackMarkdown (--markdown)', () => {
   it('emits a "My AI stack" snippet with a section per client', () => {
     const out = renderStackMarkdown(MIXED);
     expect(out.startsWith('## My AI stack\n')).toBe(true);
-    expect(out).toContain('5 tools across Claude Code, Codex, and Cursor.');
+    expect(out).toContain('7 tools across Claude Code, Codex, and Cursor.');
     expect(out).toContain('### Claude Code');
     expect(out).toContain('- **MCP servers (2):** `atelier-board`, `context7`');
     expect(out).toContain('- **Plugins (1):** `swift-lsp`');
+    expect(out).toContain('- **Skills (1):** `deep-research`');
+    expect(out).toContain('- **Subagents (1):** `code-reviewer`');
     expect(out).toContain('### Cursor');
     expect(out).toContain('devcat-cli');
   });
@@ -141,5 +159,46 @@ describe('renderStackMarkdown (--markdown)', () => {
     const out = renderStackMarkdown({ tools: [], pathsScanned: ['~/.claude.json'] });
     expect(out).toContain('## My AI stack');
     expect(out).toContain('No AI tooling detected on this machine yet.');
+  });
+});
+
+describe('renderStackJson (--json)', () => {
+  it('is a single parseable object mirroring the report', () => {
+    const parsed = JSON.parse(renderStackJson(MIXED));
+    expect(parsed.total).toBe(7);
+    expect(parsed.project_scoped).toBe(1);
+    expect(parsed.user_scoped).toBe(6);
+    expect(typeof parsed.cli_version).toBe('string');
+    expect(parsed.paths_checked).toEqual(MIXED.pathsScanned);
+  });
+
+  it('carries the same grouping and ordering as the terminal report', () => {
+    const parsed = JSON.parse(renderStackJson(MIXED));
+    expect(parsed.clients.map((c: { client: string }) => c.client)).toEqual([
+      'claude-code',
+      'codex',
+      'cursor',
+    ]);
+    const claude = parsed.clients[0];
+    expect(claude.label).toBe('Claude Code');
+    expect(claude.total).toBe(5);
+    expect(claude.types).toEqual([
+      { type: 'mcp', count: 2, names: ['atelier-board', 'context7'] },
+      { type: 'plugin', count: 1, names: ['swift-lsp'] },
+      { type: 'skill', count: 1, names: ['deep-research'] },
+      { type: 'subagent', count: 1, names: ['code-reviewer'] },
+    ]);
+  });
+
+  it('empty scan is still valid JSON with zeroed counts', () => {
+    const parsed = JSON.parse(renderStackJson({ tools: [], pathsScanned: ['~/.claude.json'] }));
+    expect(parsed.total).toBe(0);
+    expect(parsed.clients).toEqual([]);
+    expect(parsed.paths_checked).toEqual(['~/.claude.json']);
+  });
+
+  it('emits no ANSI even when colour is enabled', () => {
+    // eslint-disable-next-line no-control-regex
+    expect(renderStackJson(MIXED)).not.toMatch(/\u001b\[/);
   });
 });
