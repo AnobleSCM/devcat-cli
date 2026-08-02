@@ -1,0 +1,31 @@
+test/unit/manifest/security.test.ts
+  s_8ba42ddaefda86::t_1807c3ef5a18f2 59-64
+  s_8ba42ddaefda86::t_65b5912bdf5512 327-329,332
+  s_8ba42ddaefda86::t_ee54a9c7c89d5d 1,5-6
+  s_8ba42ddaefda86::t_f9ec2324ba711d 28-58,65-111
+  s_8ba42ddaefda86::t_b91c8a40aa44ee 254-258,260-265,267-269,271,280-293,296,299,303-308
+src/api/sync.ts
+  s_8ba42ddaefda86::t_b2162b473021e5 41-46
+  s_8ba42ddaefda86::t_7383132a7c0903 2
+src/types/api.ts
+  s_8ba42ddaefda86::t_045366904835fc 21-31
+src/lib/manifestHash.ts
+  s_8ba42ddaefda86::t_748051368fc041 17-19
+  s_8ba42ddaefda86::t_3d791861bbc36b 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4f313e46fba2e4c1623468b38c6647a442c14f56",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
