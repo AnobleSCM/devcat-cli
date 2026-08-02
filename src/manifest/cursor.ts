@@ -56,6 +56,7 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
     name,
     source: path!,
     scope: opts.scope,
+    client: 'cursor' as const,
   }));
   return { tools, pathsScanned: [scannedPath] };
 }

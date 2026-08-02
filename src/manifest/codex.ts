@@ -57,6 +57,7 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
     name,
     source: path!,
     scope: opts.scope,
+    client: 'codex' as const,
   }));
   return { tools, pathsScanned: [scannedPath] };
 }

@@ -84,6 +84,7 @@ async function readMcpServersJson(path: string, scope: 'project' | 'user'): Prom
     name,
     source: path,
     scope,
+    client: 'claude-code' as const,
   }));
   return { tools, pathsScanned: [path] };
 }
@@ -108,6 +109,7 @@ async function readInstalledPluginsJson(path: string): Promise<SourceScan> {
     name: key.split('@')[0]!,
     source: path,
     scope: 'user' as const,
+    client: 'claude-code' as const,
   }));
   return { tools, pathsScanned: [path] };
 }

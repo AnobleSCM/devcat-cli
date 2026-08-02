@@ -3,18 +3,24 @@ import { detectCodex } from './codex.js';
 import { detectCursor } from './cursor.js';
 import { dedupe } from './dedupe.js';
 
+/** Which AI-coding tool a manifest entry was found in. */
+export type ToolClient = 'claude-code' | 'codex' | 'cursor';
+
 /**
  * A single tool surfaced from any local manifest.
  *
  * Only `type` and `name` are sent to /api/sync per CLI-05.
- * `source` and `scope` are local-only metadata used for --json terminal output
- * and for ordering during the project-first dedupe pass (D-08).
+ * `source`, `scope`, and `client` are local-only metadata used for --json
+ * terminal output, for the local stack report, and for ordering during the
+ * project-first dedupe pass (D-08). `client` is always one of the fixed
+ * literals above — never a value read out of a config file.
  */
 export interface ToolEntry {
   type: 'mcp' | 'skill' | 'plugin';
   name: string;
   source: string;
   scope: 'project' | 'user';
+  client: ToolClient;
 }
 
 export interface DetectResult {

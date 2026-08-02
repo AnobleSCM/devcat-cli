@@ -199,10 +199,13 @@ describe('manifest-only-sync (CLI-05)', () => {
     }
   });
 
-  it('detect().tools entries have ONLY the expected keys (type, name, source, scope)', async () => {
+  it('detect().tools entries have ONLY the expected keys (type, name, source, scope, client)', async () => {
+    // `client` is a fixed literal set by the detector ('claude-code' | 'codex'
+    // | 'cursor'), never a value read out of a config file — so it cannot
+    // carry user data even though it never reaches the server either.
     const { detect } = await import('../../../src/manifest/index.js');
     const result = await detect(tmpHome);
-    const ALLOWED_KEYS = new Set(['type', 'name', 'source', 'scope']);
+    const ALLOWED_KEYS = new Set(['type', 'name', 'source', 'scope', 'client']);
     for (const t of result.tools) {
       for (const k of Object.keys(t)) {
         expect(ALLOWED_KEYS.has(k), `unexpected key on ToolEntry: ${k}`).toBe(true);
