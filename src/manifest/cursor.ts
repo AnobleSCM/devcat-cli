@@ -36,7 +36,7 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.cursor', 'mcp.json');
     // Same $HOME-is-an-ancestor guard as the Codex detector.
-    if (path && isUserLevelPath(path, '.cursor', 'mcp.json')) path = null;
+    if (path && (await isUserLevelPath(path, '.cursor', 'mcp.json'))) path = null;
     scannedPath = path ?? join(opts.cwd, '.cursor', 'mcp.json');
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }

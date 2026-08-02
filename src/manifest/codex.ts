@@ -84,7 +84,7 @@ async function detectCodexMcp(opts: { cwd?: string; scope: 'project' | 'user' })
     path = await findUpward(opts.cwd, '.codex', 'config.toml');
     // $HOME is an ancestor of most working directories; the user pass above
     // already reads that exact file, so don't relabel it project-scoped.
-    if (path && isUserLevelPath(path, '.codex', 'config.toml')) path = null;
+    if (path && (await isUserLevelPath(path, '.codex', 'config.toml'))) path = null;
     scannedPath = path ?? join(opts.cwd, '.codex', 'config.toml');
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }

@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, parse } from 'node:path';
 
@@ -40,11 +40,34 @@ export async function findUpward(start: string, ...relativePathSegments: string[
  * path use this to skip the hit rather than mislabel it — nothing is lost,
  * the same tools are still detected, with the right scope.
  *
+ * Compares canonically, not by string. A symlinked $HOME, a cwd reached
+ * through a symlink, or `cd ~ && devcat` all produce a path that names the
+ * same file by a different route, and string equality misses every one.
+ *
  * Only for paths that HAVE a user-scope reader. `.mcp.json` has none, so
  * ~/.mcp.json is still legitimately picked up by the project walk.
  */
-export function isUserLevelPath(found: string, ...relativePathSegments: string[]): boolean {
-  return found === join(homedir(), ...relativePathSegments);
+export async function isUserLevelPath(
+  found: string,
+  ...relativePathSegments: string[]
+): Promise<boolean> {
+  const userPath = join(homedir(), ...relativePathSegments);
+  if (found === userPath) return true;
+  return resolvesToSame(found, userPath);
+}
+
+/** True when both paths resolve, through symlinks, to the same location. */
+export async function resolvesToSame(a: string, b: string): Promise<boolean> {
+  const [ra, rb] = await Promise.all([realpathOrNull(a), realpathOrNull(b)]);
+  return ra !== null && ra === rb;
+}
+
+async function realpathOrNull(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
 }
 
 /**

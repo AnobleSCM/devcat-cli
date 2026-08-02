@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -84,6 +84,94 @@ describe('$HOME is not a project root — Cursor', () => {
     const result = await detectCursor({ cwd, scope: 'project' });
     expect(result.tools.map((t) => t.name)).toEqual(['repo-local']);
     expect(result.tools[0]!.scope).toBe('project');
+  });
+});
+
+describe('$HOME is not a project root — when cwd IS $HOME', () => {
+  // The guard nulls the upward hit, but the project pass then fell back to
+  // join(cwd, '.claude', 'skills') — which, run from $HOME, IS the guarded
+  // user root. Project-first dedupe then kept the whole user shelf as
+  // project-scoped. `cd ~ && npx devcat-cli` is the commonest invocation
+  // there is, and the earlier tests all used directories nested BENEATH
+  // $HOME, so none of them reached this.
+  function seedShelf(): void {
+    const skills = join(tmpHome, '.claude', 'skills', 'panel');
+    mkdirSync(skills, { recursive: true });
+    writeFileSync(join(skills, 'SKILL.md'), '# panel\n');
+    const agents = join(tmpHome, '.claude', 'agents');
+    mkdirSync(agents, { recursive: true });
+    writeFileSync(join(agents, 'debugger.md'), 'x');
+  }
+
+  it('does not claim user skills as project-scoped', async () => {
+    seedShelf();
+    const { detectClaudeCode } = await import('../../../src/manifest/claude.js');
+    const result = await detectClaudeCode({ cwd: tmpHome, scope: 'project' });
+    expect(result.tools.filter((t) => t.type === 'skill')).toEqual([]);
+  });
+
+  it('does not claim user subagents as project-scoped', async () => {
+    seedShelf();
+    const { detectClaudeCode } = await import('../../../src/manifest/claude.js');
+    const result = await detectClaudeCode({ cwd: tmpHome, scope: 'project' });
+    expect(result.tools.filter((t) => t.type === 'subagent')).toEqual([]);
+  });
+
+  it('the whole scan from $HOME reports the shelf as user-wide, exactly once', async () => {
+    seedShelf();
+    const { detect } = await import('../../../src/manifest/index.js');
+    const result = await detect(tmpHome);
+
+    const skills = result.tools.filter((t) => t.type === 'skill');
+    const subagents = result.tools.filter((t) => t.type === 'subagent');
+    expect(skills.map((t) => t.name)).toEqual(['panel']);
+    expect(subagents.map((t) => t.name)).toEqual(['debugger']);
+    expect([...skills, ...subagents].every((t) => t.scope === 'user')).toBe(true);
+    expect(result.tools.filter((t) => t.scope === 'project')).toEqual([]);
+  });
+
+  it('sees through a symlinked route to $HOME', async () => {
+    // A cwd that reaches $HOME by a different textual path — string equality
+    // misses this, canonical comparison does not.
+    seedShelf();
+    const link = join(tmpdir(), `devcat-homelink-${process.pid}`);
+    rmSync(link, { force: true });
+    symlinkSync(tmpHome, link);
+    try {
+      const { detectClaudeCode } = await import('../../../src/manifest/claude.js');
+      const result = await detectClaudeCode({ cwd: link, scope: 'project' });
+      expect(result.tools.filter((t) => t.type === 'skill')).toEqual([]);
+      expect(result.tools.filter((t) => t.type === 'subagent')).toEqual([]);
+    } finally {
+      rmSync(link, { force: true });
+    }
+  });
+
+  it('a genuine project shelf inside $HOME is still project-scoped', async () => {
+    seedShelf();
+    const projectSkills = join(tmpHome, 'repo', '.claude', 'skills', 'repo-skill');
+    mkdirSync(projectSkills, { recursive: true });
+    writeFileSync(join(projectSkills, 'SKILL.md'), '# repo\n');
+
+    const { detectClaudeCode } = await import('../../../src/manifest/claude.js');
+    const result = await detectClaudeCode({ cwd: join(tmpHome, 'repo'), scope: 'project' });
+    const skills = result.tools.filter((t) => t.type === 'skill');
+    expect(skills.map((t) => t.name)).toEqual(['repo-skill']);
+    expect(skills[0]!.scope).toBe('project');
+  });
+});
+
+describe('$HOME is not a project root — Codex and Cursor from $HOME', () => {
+  it('neither claims its user config as project-scoped when cwd is $HOME', async () => {
+    mkdirSync(join(tmpHome, '.codex'), { recursive: true });
+    writeFileSync(join(tmpHome, '.codex', 'config.toml'), '[mcp_servers.serena]\n');
+    mkdirSync(join(tmpHome, '.cursor'), { recursive: true });
+    writeFileSync(join(tmpHome, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { figma: {} } }));
+
+    const { detectCodex } = await import('../../../src/manifest/codex.js');
+    const { detectCursor } = await import('../../../src/manifest/cursor.js');
+    expect((await detectCodex({ cwd: tmpHome, scope: 'project' })).tools).toEqual([]);
+    expect((await detectCursor({ cwd: tmpHome, scope: 'project' })).tools).toEqual([]);
   });
 });
 

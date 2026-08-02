@@ -50,17 +50,25 @@ async function detectClaudeProjectScope(cwd: string): Promise<SourceScan> {
   ]);
 
   // The user-scope pass reads ~/.claude/skills and ~/.claude/agents directly,
-  // so a walk that climbed all the way to $HOME is dropped here — otherwise
-  // the whole user shelf would be reported as project-scoped.
-  const skillsDir = skillsHit && !isUserLevelPath(skillsHit, '.claude', 'skills') ? skillsHit : null;
-  const agentsDir = agentsHit && !isUserLevelPath(agentsHit, '.claude', 'agents') ? agentsHit : null;
+  // so a walk that reached them is dropped here — otherwise the whole user
+  // shelf would be reported as project-scoped.
+  //
+  // The fallback needs the same guard, not just the hit. Running from $HOME
+  // itself, the walk finds the user root, the guard nulls it, and then
+  // join(cwd, '.claude', 'skills') IS that same directory — so the fallback
+  // would scan the user shelf and project-first dedupe would keep every
+  // entry as project-scoped. `cd ~ && npx devcat-cli` is not an exotic case.
+  const [skillsDir, agentsDir] = await Promise.all([
+    projectDirToScan(skillsHit, cwd, '.claude', 'skills'),
+    projectDirToScan(agentsHit, cwd, '.claude', 'agents'),
+  ]);
 
   const [mcp, skills, subagents] = await Promise.all([
     mcpPath
       ? readMcpServersJson(mcpPath, 'project')
       : Promise.resolve({ tools: [], pathsScanned: [join(cwd, '.mcp.json')] }),
-    readSkillsDir(skillsDir ?? join(cwd, '.claude', 'skills'), 'project'),
-    readSubagentsDir(agentsDir ?? join(cwd, '.claude', 'agents'), 'project'),
+    scanProjectDir(skillsDir, readSkillsDir),
+    scanProjectDir(agentsDir, readSubagentsDir),
   ]);
 
   return mergeScans([mcp, skills, subagents]);
@@ -92,6 +100,37 @@ async function detectClaudeUserScope(): Promise<SourceScan> {
     skills,
     subagents,
   ]);
+}
+
+/**
+ * Decide what the project pass may scan for a directory-shaped location.
+ *
+ * Returns the directory to scan, or a report-only path when there is nothing
+ * legitimate to scan there — the caller still names it among the locations
+ * checked, unless it is the user root, which the user pass already reports.
+ */
+async function projectDirToScan(
+  hit: string | null,
+  cwd: string,
+  ...segments: string[]
+): Promise<{ scan: string | null; report: string | null }> {
+  const fallback = join(cwd, ...segments);
+  const candidate = hit ?? fallback;
+  // Canonical comparison: `cd ~`, a symlinked $HOME, and a cwd reached via a
+  // symlink all name the user root by a route string equality would miss.
+  if (await isUserLevelPath(candidate, ...segments)) {
+    return { scan: null, report: null };
+  }
+  return { scan: hit, report: candidate };
+}
+
+/** Run a directory reader, or produce a report-only scan when it must be skipped. */
+async function scanProjectDir(
+  target: { scan: string | null; report: string | null },
+  read: (path: string, scope: 'project' | 'user') => Promise<SourceScan>,
+): Promise<SourceScan> {
+  if (target.scan) return read(target.scan, 'project');
+  return { tools: [], pathsScanned: target.report ? [target.report] : [] };
 }
 
 function mergeScans(scans: SourceScan[]): SourceScan {
