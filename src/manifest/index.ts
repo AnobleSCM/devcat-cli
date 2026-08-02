@@ -2,6 +2,10 @@ import { detectClaudeCode } from './claude.js';
 import { detectCodex } from './codex.js';
 import { detectCursor } from './cursor.js';
 import { dedupe } from './dedupe.js';
+import type { RootTruncation } from './dirScan.js';
+
+export type { RootTruncation } from './dirScan.js';
+export { READ_CEILING, MAX_ENTRIES_EXAMINED } from './dirScan.js';
 
 /** Which AI-coding tool a manifest entry was found in. */
 export type ToolClient = 'claude-code' | 'codex' | 'cursor';
@@ -49,6 +53,13 @@ export function syncableTools(tools: readonly ToolEntry[]): SyncableToolEntry[] 
 export interface DetectResult {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /**
+   * Roots where a scan bound bit, so something installed is missing from
+   * `tools`. Empty on any ordinary machine. Every output layer discloses
+   * this — a report that quietly omits a tool while claiming completeness
+   * is worse than one that admits it stopped early.
+   */
+  truncations: RootTruncation[];
 }
 
 /**
@@ -71,8 +82,10 @@ export async function detect(cwd: string): Promise<DetectResult> {
   ]);
   const allTools = sources.flatMap((s) => s.tools);
   const allPaths = sources.flatMap((s) => s.pathsScanned);
+  const allTruncations = sources.flatMap((s) => s.truncations ?? []);
   return {
     tools: dedupe(allTools),
     pathsScanned: allPaths,
+    truncations: allTruncations,
   };
 }

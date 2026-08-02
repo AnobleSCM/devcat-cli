@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
-import { scanSkills } from './dirScan.js';
+import { scanSkills, type RootTruncation } from './dirScan.js';
 import type { ToolEntry } from './index.js';
 
 interface CodexConfigToml {
@@ -13,6 +13,8 @@ interface CodexConfigToml {
 interface SourceScan {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /** Roots where a scan bound bit. Absent means nothing was left out. */
+  truncations?: RootTruncation[];
 }
 
 /**
@@ -24,10 +26,12 @@ interface SourceScan {
  * Two dedupe passes handle that, and both are order-independent in effect:
  *
  *   - Within a root, scanSkills() collapses aliases by resolved path.
- *   - Across clients, dedupe() collapses by (type, name), keeping the first
- *     occurrence. detect() scans Claude Code before Codex, so a skill on both
- *     shelves is listed once under Claude Code — deterministically, not by
- *     whichever filesystem answered first.
+ *   - Across clients, dedupe() keys path-backed entries on (type, resolved
+ *     path), keeping the first occurrence. detect() scans Claude Code before
+ *     Codex, so a skill both shelves link to the same directory is listed
+ *     once under Claude Code — deterministically, not by whichever filesystem
+ *     answered first. Two same-named skills at DIFFERENT paths are different
+ *     skills and both survive.
  */
 export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
   const mcp = await detectCodexMcp(opts);
@@ -37,6 +41,7 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
   return {
     tools: [...mcp.tools, ...skills.tools],
     pathsScanned: [...mcp.pathsScanned, ...skills.pathsScanned],
+    truncations: [...(mcp.truncations ?? []), ...(skills.truncations ?? [])],
   };
 }
 
@@ -45,7 +50,7 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
  * skill entry — never part of the /api/sync payload (see syncableTools).
  */
 async function readCodexSkillsDir(path: string): Promise<SourceScan> {
-  const hits = await scanSkills(path);
+  const { hits, truncation } = await scanSkills(path);
   const tools: ToolEntry[] = hits.map((hit) => ({
     type: 'skill' as const,
     name: hit.name,
@@ -54,7 +59,7 @@ async function readCodexSkillsDir(path: string): Promise<SourceScan> {
     client: 'codex' as const,
     canonicalPath: hit.realPath,
   }));
-  return { tools, pathsScanned: [path] };
+  return { tools, pathsScanned: [path], truncations: truncation ? [truncation] : [] };
 }
 
 /**

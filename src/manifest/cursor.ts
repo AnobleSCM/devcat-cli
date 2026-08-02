@@ -11,6 +11,8 @@ interface CursorMcpFile {
 interface SourceScan {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /** Cursor has no directory-shaped detections, so this is always absent. */
+  truncations?: never[];
 }
 
 /**

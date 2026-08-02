@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { findUpward, findUpwardDir, isUserLevelPath } from '../lib/findUpward.js';
-import { scanSkills, scanSubagents } from './dirScan.js';
+import { scanSkills, scanSubagents, type RootTruncation } from './dirScan.js';
 import type { ToolEntry } from './index.js';
 
 interface McpServersFile {
@@ -17,6 +17,8 @@ interface InstalledPluginsFile {
 interface SourceScan {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /** Roots where a scan bound bit. Absent means nothing was left out. */
+  truncations?: RootTruncation[];
 }
 
 /**
@@ -96,6 +98,7 @@ function mergeScans(scans: SourceScan[]): SourceScan {
   return {
     tools: scans.flatMap((s) => s.tools),
     pathsScanned: scans.flatMap((s) => s.pathsScanned),
+    truncations: scans.flatMap((s) => s.truncations ?? []),
   };
 }
 
@@ -104,7 +107,7 @@ function mergeScans(scans: SourceScan[]): SourceScan {
  * they never enter the /api/sync payload (see syncableTools in index.ts).
  */
 async function readSkillsDir(path: string, scope: 'project' | 'user'): Promise<SourceScan> {
-  const hits = await scanSkills(path);
+  const { hits, truncation } = await scanSkills(path);
   const tools: ToolEntry[] = hits.map((hit) => ({
     type: 'skill' as const,
     name: hit.name,
@@ -113,12 +116,12 @@ async function readSkillsDir(path: string, scope: 'project' | 'user'): Promise<S
     client: 'claude-code' as const,
     canonicalPath: hit.realPath,
   }));
-  return { tools, pathsScanned: [path] };
+  return { tools, pathsScanned: [path], truncations: truncation ? [truncation] : [] };
 }
 
 /** Subagent personas under an `agents/` root. Report-only, as above. */
 async function readSubagentsDir(path: string, scope: 'project' | 'user'): Promise<SourceScan> {
-  const hits = await scanSubagents(path);
+  const { hits, truncation } = await scanSubagents(path);
   const tools: ToolEntry[] = hits.map((hit) => ({
     type: 'subagent' as const,
     name: hit.name,
@@ -127,7 +130,7 @@ async function readSubagentsDir(path: string, scope: 'project' | 'user'): Promis
     client: 'claude-code' as const,
     canonicalPath: hit.realPath,
   }));
-  return { tools, pathsScanned: [path] };
+  return { tools, pathsScanned: [path], truncations: truncation ? [truncation] : [] };
 }
 
 async function readMcpServersJson(path: string, scope: 'project' | 'user'): Promise<SourceScan> {

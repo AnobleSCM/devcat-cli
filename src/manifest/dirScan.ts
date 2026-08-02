@@ -1,4 +1,4 @@
-import { readdir, realpath, stat } from 'node:fs/promises';
+import { opendir, realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /**
@@ -16,16 +16,30 @@ import { join } from 'node:path';
  *     path is what deduplicates aliases pointing at the same skill.
  *   - A broken symlink, an unreadable directory, or a vanished entry is
  *     skipped. A machine with a stale link never fails a scan.
- *   - Entry count per root is capped, and the cap is applied after sorting so
- *     the kept subset is the same on every run regardless of the order the
- *     filesystem happened to return.
+ *   - Two hard bounds, so a pathological root can neither hang the CLI nor
+ *     quietly change what gets reported:
+ *       READ_CEILING limits how many entries are ever pulled out of one
+ *       directory — the iteration stops there, it does not read the rest.
+ *       MAX_ENTRIES_EXAMINED limits how many of those get the expensive
+ *       per-entry stat/realpath work, applied AFTER sorting so the kept
+ *       subset is the same on every run.
+ *   - Whenever either bound bites, the scan says so. Silently dropping a
+ *     valid tool while every output claims completeness is the failure this
+ *     reporting exists to prevent.
  *
  * Names come from the directory (or file) name, which is how skills and
  * subagents are actually addressed — no file contents are read.
  */
 
-/** Defensive bound, in the spirit of findUpward's 64-level cap. */
-const MAX_ENTRIES_PER_ROOT = 500;
+/**
+ * Hard upper bound on entries pulled from a single directory. Reached only by
+ * a root that is not a real config directory; the shelves this scans hold
+ * dozens. Streaming via opendir means the remainder is never read at all.
+ */
+export const READ_CEILING = 10_000;
+
+/** Entries that get the per-entry filesystem work, after deterministic sort. */
+export const MAX_ENTRIES_EXAMINED = 500;
 
 export interface DirHit {
   name: string;
@@ -33,14 +47,34 @@ export interface DirHit {
   realPath: string;
 }
 
+/** Emitted when a bound bit, so every output layer can disclose it. */
+export interface RootTruncation {
+  root: string;
+  /** Candidate names actually read from the directory. */
+  entriesSeen: number;
+  /** Of those, how many were examined (the rest were dropped by the cap). */
+  entriesKept: number;
+  /** True when reading stopped at READ_CEILING — more names exist, unread. */
+  hitReadCeiling: boolean;
+}
+
+export interface DirScanResult {
+  hits: DirHit[];
+  /** Null when the whole root was read and examined. */
+  truncation: RootTruncation | null;
+}
+
 /**
  * Skills: an immediate child directory of `root` containing SKILL.md.
  *
  * Depth 1. Non-skill clutter that shares the directory (`.git`, `AGENTS.md`,
  * a README) is ignored by the SKILL.md requirement.
+ *
+ * `readCeiling` exists so tests can reach the ceiling path without creating
+ * ten thousand directories. Production always uses the default.
  */
-export async function scanSkills(root: string): Promise<DirHit[]> {
-  return scanRoot(root, async (entryPath, name) => {
+export async function scanSkills(root: string, readCeiling = READ_CEILING): Promise<DirScanResult> {
+  return scanRoot(root, readCeiling, async (entryPath, name) => {
     const resolved = await resolveDir(entryPath);
     if (!resolved) return null;
     if (!(await isFile(join(resolved, 'SKILL.md')))) return null;
@@ -59,8 +93,11 @@ export async function scanSkills(root: string): Promise<DirHit[]> {
  * costs one stat for a known filename rather than a directory listing, so
  * nothing here reads an unbounded number of entries.
  */
-export async function scanSubagents(root: string): Promise<DirHit[]> {
-  return scanRoot(root, async (entryPath, name) => {
+export async function scanSubagents(
+  root: string,
+  readCeiling = READ_CEILING,
+): Promise<DirScanResult> {
+  return scanRoot(root, readCeiling, async (entryPath, name) => {
     if (name.toLowerCase().endsWith('.md')) {
       if (!(await isFile(entryPath))) return null;
       const resolved = await realpathOrNull(entryPath);
@@ -75,30 +112,64 @@ export async function scanSubagents(root: string): Promise<DirHit[]> {
 }
 
 /**
- * Shared shape: list a root's immediate children, classify each with
- * `classify`, drop the misses, and dedupe on resolved path.
+ * Read up to READ_CEILING candidate names out of `root`, streaming.
+ *
+ * opendir yields entries lazily, so hitting the ceiling means the remainder
+ * of a pathological directory is never read — the bound is on the work done,
+ * not just on the result. Dot-entries are skipped but still count toward the
+ * ceiling, so a directory full of them cannot spin forever either.
+ *
+ * Returns null when the root cannot be opened at all (missing, or no
+ * permission) — indistinguishable outcomes, both meaning "nothing here".
+ */
+async function readCandidateNames(
+  root: string,
+  readCeiling: number,
+): Promise<{ names: string[]; hitReadCeiling: boolean } | null> {
+  let dir;
+  try {
+    dir = await opendir(root);
+  } catch {
+    return null;
+  }
+
+  const names: string[] = [];
+  let iterated = 0;
+  let hitReadCeiling = false;
+  try {
+    for await (const entry of dir) {
+      if (iterated >= readCeiling) {
+        hitReadCeiling = true;
+        break;
+      }
+      iterated += 1;
+      if (entry.name.startsWith('.')) continue;
+      names.push(entry.name);
+    }
+  } catch {
+    // A directory that vanishes or errors mid-iteration still yields whatever
+    // was read. The async iterator closes the handle on the way out.
+  }
+  return { names, hitReadCeiling };
+}
+
+/**
+ * Shared shape: read a root's immediate children under both bounds, classify
+ * each with `classify`, drop the misses, dedupe on resolved path, and report
+ * whether anything was left out.
  */
 async function scanRoot(
   root: string,
+  readCeiling: number,
   classify: (entryPath: string, name: string) => Promise<DirHit | null>,
-): Promise<DirHit[]> {
-  let names: string[];
-  try {
-    // readdir materializes the whole listing. Node's streaming alternative
-    // (opendir) would avoid that, but a deterministic cap has to know every
-    // candidate name before choosing which to keep — so the names are read in
-    // full (strings only, cheap), then sorted, and only then is the cap
-    // applied to the expensive per-entry stat/realpath work below.
-    names = await readdir(root);
-  } catch {
-    // Missing root, or no permission to read it. Either way: nothing here.
-    return [];
-  }
+): Promise<DirScanResult> {
+  const read = await readCandidateNames(root, readCeiling);
+  if (!read) return { hits: [], truncation: null };
 
-  const candidates = names
-    .filter((name) => !name.startsWith('.'))
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, MAX_ENTRIES_PER_ROOT);
+  // Sort before capping so the examined subset is the same on every run,
+  // whatever order the filesystem returned.
+  const sorted = [...read.names].sort((a, b) => a.localeCompare(b));
+  const candidates = sorted.slice(0, MAX_ENTRIES_EXAMINED);
 
   const settled = await Promise.all(
     candidates.map(async (name) => {
@@ -118,7 +189,19 @@ async function scanRoot(
     seen.add(hit.realPath);
     hits.push(hit);
   }
-  return hits;
+
+  const droppedByCap = sorted.length > candidates.length;
+  const truncation: RootTruncation | null =
+    droppedByCap || read.hitReadCeiling
+      ? {
+          root,
+          entriesSeen: sorted.length,
+          entriesKept: candidates.length,
+          hitReadCeiling: read.hitReadCeiling,
+        }
+      : null;
+
+  return { hits, truncation };
 }
 
 /** Resolve `path` to a real directory, or null if it is not one / is broken. */

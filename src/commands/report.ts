@@ -1,5 +1,11 @@
 import { detect } from '../manifest/index.js';
-import { renderStackReport, renderStackMarkdown, renderStackJson } from '../ui/report.js';
+import {
+  renderStackReport,
+  renderStackMarkdown,
+  renderStackJson,
+  truncationWarnings,
+} from '../ui/report.js';
+import { c } from '../ui/colors.js';
 import { EXIT_OK, type ExitCode } from '../lib/exitCodes.js';
 
 export interface ReportOptions {
@@ -22,6 +28,14 @@ export interface ReportOptions {
  */
 export async function runReport(opts: ReportOptions): Promise<ExitCode> {
   const manifest = await detect(process.cwd());
+
+  // Disclosure goes to stderr in every mode, including --json, so a piped
+  // stdout stays parseable while the operator still learns the scan was
+  // incomplete. Named roots and counts, one line each.
+  for (const warning of truncationWarnings(manifest.truncations)) {
+    process.stderr.write(`${c.yellow(warning)}\n`);
+  }
+
   let out: string;
   if (opts.json) {
     out = renderStackJson(manifest);

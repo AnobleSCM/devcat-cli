@@ -4,6 +4,7 @@ import {
   renderStackReport,
   renderStackMarkdown,
   renderStackJson,
+  truncationWarnings,
 } from '../../../src/ui/report.js';
 import type { DetectResult, ToolEntry } from '../../../src/manifest/index.js';
 
@@ -32,6 +33,7 @@ const MIXED: DetectResult = {
     tool({ name: 'serena', client: 'codex' }),
   ],
   pathsScanned: ['/p/.mcp.json', '~/.claude.json', '~/.codex/config.toml', '~/.cursor/mcp.json'],
+  truncations: [],
 };
 
 describe('groupStack', () => {
@@ -88,6 +90,7 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     const userOnly: DetectResult = {
       tools: [tool({ name: 'a' })],
       pathsScanned: ['~/.claude.json'],
+      truncations: [],
     };
     expect(renderStackReport(userOnly)).not.toContain('project-scoped');
   });
@@ -96,6 +99,7 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     const many: DetectResult = {
       tools: Array.from({ length: 20 }, (_, i) => tool({ name: `mcp-server-number-${i}` })),
       pathsScanned: ['~/.claude.json'],
+      truncations: [],
     };
     const lines = renderStackReport(many).split('\n');
     const nameLines = lines.filter((l) => l.includes('mcp-server-number-'));
@@ -111,14 +115,18 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
   });
 
   it('singularizes a one-tool stack', () => {
-    const one: DetectResult = { tools: [tool({ name: 'solo' })], pathsScanned: ['~/.claude.json'] };
+    const one: DetectResult = {
+      tools: [tool({ name: 'solo' })],
+      pathsScanned: ['~/.claude.json'],
+      truncations: [],
+    };
     const out = renderStackReport(one);
     expect(out).toContain('Your AI-coding stack — 1 tool');
     expect(out).toContain('1 tool in Claude Code · 1 location checked');
   });
 
   it('empty scan: names the paths it checked instead of printing an empty stack', () => {
-    const out = renderStackReport({ tools: [], pathsScanned: ['/p/.mcp.json', '~/.cursor/mcp.json'] });
+    const out = renderStackReport({ tools: [], pathsScanned: ['/p/.mcp.json', '~/.cursor/mcp.json'], truncations: [] });
     expect(out).toContain('No AI tooling detected.');
     expect(out).toContain('/p/.mcp.json');
     expect(out).toContain('~/.cursor/mcp.json');
@@ -149,6 +157,7 @@ describe('renderStackMarkdown (--markdown)', () => {
     const many: DetectResult = {
       tools: Array.from({ length: 20 }, (_, i) => tool({ name: `mcp-server-number-${i}` })),
       pathsScanned: ['~/.claude.json'],
+      truncations: [],
     };
     const bullets = renderStackMarkdown(many).split('\n').filter((l) => l.startsWith('- **'));
     expect(bullets).toHaveLength(1);
@@ -156,7 +165,7 @@ describe('renderStackMarkdown (--markdown)', () => {
   });
 
   it('empty scan still produces a valid snippet', () => {
-    const out = renderStackMarkdown({ tools: [], pathsScanned: ['~/.claude.json'] });
+    const out = renderStackMarkdown({ tools: [], pathsScanned: ['~/.claude.json'], truncations: [] });
     expect(out).toContain('## My AI stack');
     expect(out).toContain('No AI tooling detected on this machine yet.');
   });
@@ -175,6 +184,7 @@ describe('name sanitization', () => {
   const hostile: DetectResult = {
     tools: [tool({ name: HOSTILE }), tool({ name: 'back`tick', type: 'skill' })],
     pathsScanned: ['~/.claude.json'],
+    truncations: [],
   };
 
   it('strips control characters from the terminal report', () => {
@@ -202,6 +212,82 @@ describe('name sanitization', () => {
       c.types.flatMap((t) => t.names),
     );
     expect(names).toContain(HOSTILE);
+  });
+});
+
+describe('truncation disclosure', () => {
+  const TRUNCATED: DetectResult = {
+    tools: [tool({ name: 'context7' })],
+    pathsScanned: ['~/.claude/skills'],
+    truncations: [
+      { root: '~/.claude/skills', entriesSeen: 520, entriesKept: 500, hitReadCeiling: false },
+    ],
+  };
+
+  const CEILINGED: DetectResult = {
+    ...TRUNCATED,
+    truncations: [
+      { root: '~/.claude/skills', entriesSeen: 10000, entriesKept: 500, hitReadCeiling: true },
+    ],
+  };
+
+  it('the terminal report admits it is incomplete', () => {
+    const out = renderStackReport(TRUNCATED);
+    expect(out).toContain('1 location was truncated');
+    expect(out).toContain('some tools are not listed');
+  });
+
+  it('the markdown snippet admits it too', () => {
+    const out = renderStackMarkdown(TRUNCATED);
+    expect(out).toContain('truncated');
+    expect(out).toContain('some tools are not listed');
+  });
+
+  it('neither says anything when nothing was truncated', () => {
+    expect(renderStackReport(MIXED)).not.toContain('truncated');
+    expect(renderStackMarkdown(MIXED)).not.toContain('truncated');
+  });
+
+  it('JSON carries structured per-root metadata', () => {
+    const parsed = JSON.parse(renderStackJson(TRUNCATED));
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.truncations).toEqual([
+      {
+        root: '~/.claude/skills',
+        entries_seen: 520,
+        entries_kept: 500,
+        hit_read_ceiling: false,
+      },
+    ]);
+  });
+
+  it('JSON reports truncated:false and an empty array on a clean scan', () => {
+    const parsed = JSON.parse(renderStackJson(MIXED));
+    expect(parsed.truncated).toBe(false);
+    expect(parsed.truncations).toEqual([]);
+  });
+
+  it('the stderr warning names the root and the counts', () => {
+    const [warning] = truncationWarnings(TRUNCATED.truncations);
+    expect(warning).toContain('~/.claude/skills');
+    expect(warning).toContain('520 entries read');
+    expect(warning).toContain('500 examined');
+    expect(warning).not.toContain('ceiling');
+  });
+
+  it('the stderr warning says so when the read ceiling was hit', () => {
+    const [warning] = truncationWarnings(CEILINGED.truncations);
+    expect(warning).toContain('10000-entry ceiling');
+    expect(warning).toContain('more may exist unread');
+  });
+
+  it('sanitizes a hostile root path in the warning', () => {
+    const [warning] = truncationWarnings([
+      { root: 'evil\u001b[31m/skills', entriesSeen: 600, entriesKept: 500, hitReadCeiling: false },
+    ]);
+    // eslint-disable-next-line no-control-regex
+    expect(warning).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    expect(warning).toContain('evil[31m/skills');
   });
 });
 
@@ -234,7 +320,7 @@ describe('renderStackJson (--json)', () => {
   });
 
   it('empty scan is still valid JSON with zeroed counts', () => {
-    const parsed = JSON.parse(renderStackJson({ tools: [], pathsScanned: ['~/.claude.json'] }));
+    const parsed = JSON.parse(renderStackJson({ tools: [], pathsScanned: ['~/.claude.json'], truncations: [] }));
     expect(parsed.total).toBe(0);
     expect(parsed.clients).toEqual([]);
     expect(parsed.paths_checked).toEqual(['~/.claude.json']);

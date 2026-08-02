@@ -1,4 +1,5 @@
-import type { DetectResult, ToolEntry, ToolClient } from '../manifest/index.js';
+import type { DetectResult, ToolEntry, ToolClient, RootTruncation } from '../manifest/index.js';
+import { READ_CEILING } from '../manifest/index.js';
 import { CLI_VERSION } from '../version.js';
 import { c, SUCCESS_GLYPH } from './colors.js';
 
@@ -149,7 +150,35 @@ export function renderStackReport(result: DetectResult): string {
     lines.push(c.dim(`${projectScoped} project-scoped · ${total - projectScoped} user-wide`));
   }
 
+  if (result.truncations.length > 0) {
+    lines.push('');
+    lines.push(c.yellow(truncationFootnote(result.truncations)));
+  }
+
   return lines.join('\n');
+}
+
+/**
+ * One line admitting the report is incomplete. Short on purpose — the detail
+ * goes to stderr and to --json; this exists so a reader of the report itself
+ * is never told a partial list is the whole list.
+ */
+export function truncationFootnote(truncations: readonly RootTruncation[]): string {
+  const count = truncations.length;
+  return `! ${count} ${count === 1 ? 'location was' : 'locations were'} truncated — some tools are not listed. See --json for details.`;
+}
+
+/**
+ * Per-root detail, for stderr. Named locations and counts, so the user can
+ * see which directory is oversized and by how much.
+ */
+export function truncationWarnings(truncations: readonly RootTruncation[]): string[] {
+  return truncations.map((t) => {
+    const ceiling = t.hitReadCeiling
+      ? ` Reading stopped at the ${READ_CEILING}-entry ceiling, so more may exist unread.`
+      : '';
+    return `! Truncated scan of ${sanitizeName(t.root)} — ${t.entriesSeen} entries read, ${t.entriesKept} examined. Some tools are not listed.${ceiling}`;
+  });
 }
 
 /**
@@ -177,6 +206,11 @@ export function renderStackMarkdown(result: DetectResult): string {
       const rendered = names.map((n) => `\`${sanitizeMarkdownName(n)}\``).join(', ');
       lines.push(`- **${TYPE_LABEL_MARKDOWN[type]} (${names.length}):** ${rendered}`);
     }
+  }
+
+  if (result.truncations.length > 0) {
+    lines.push('');
+    lines.push(`> ${truncationFootnote(result.truncations)}`);
   }
 
   lines.push('');
@@ -212,6 +246,13 @@ export function renderStackJson(result: DetectResult): string {
       })),
     })),
     paths_checked: result.pathsScanned,
+    truncated: result.truncations.length > 0,
+    truncations: result.truncations.map((t) => ({
+      root: t.root,
+      entries_seen: t.entriesSeen,
+      entries_kept: t.entriesKept,
+      hit_read_ceiling: t.hitReadCeiling,
+    })),
   };
   return JSON.stringify(payload, null, 2);
 }
@@ -224,7 +265,7 @@ const MARKDOWN_FOOTER =
  * config location the CLI does not know about yet.
  */
 function renderEmptyStack(pathsScanned: string[]): string {
-  const list = pathsScanned.map((p) => `  - ${p}`).join('\n');
+  const list = pathsScanned.map((p) => `  - ${sanitizeName(p)}`).join('\n');
   return [
     `${SUCCESS_GLYPH} ${c.bold('No AI tooling detected.')}`,
     '',

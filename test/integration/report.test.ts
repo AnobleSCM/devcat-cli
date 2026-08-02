@@ -78,21 +78,29 @@ afterAll(() => {
 async function runAndCapture(
   markdown: boolean,
   json = false,
-): Promise<{ exitCode: number; out: string }> {
+): Promise<{ exitCode: number; out: string; err: string }> {
   const chunks: string[] = [];
+  const errChunks: string[] = [];
   const writeSpy = vi
     .spyOn(process.stdout, 'write')
     .mockImplementation((chunk: string | Uint8Array): boolean => {
       chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
       return true;
     });
+  const errSpy = vi
+    .spyOn(process.stderr, 'write')
+    .mockImplementation((chunk: string | Uint8Array): boolean => {
+      errChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
+      return true;
+    });
   const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(projectDir);
   try {
     const { runReport } = await import('../../src/commands/report.js');
     const exitCode = await runReport({ markdown, json });
-    return { exitCode, out: chunks.join('') };
+    return { exitCode, out: chunks.join(''), err: errChunks.join('') };
   } finally {
     writeSpy.mockRestore();
+    errSpy.mockRestore();
     cwdSpy.mockRestore();
   }
 }
@@ -180,5 +188,65 @@ describe('report — --json', () => {
     const { out } = await runAndCapture(true, true);
     expect(() => JSON.parse(out)).not.toThrow();
     expect(out).not.toContain('## My AI stack');
+  });
+
+  it('reports truncated:false and no warning on an ordinary machine', async () => {
+    const { out, err } = await runAndCapture(false, true);
+    expect(JSON.parse(out).truncated).toBe(false);
+    expect(err).toBe('');
+  });
+});
+
+describe('report — truncation is disclosed end to end', () => {
+  let bigHome: string;
+
+  beforeAll(() => {
+    // A skills root over the 500 examine cap.
+    bigHome = mkdtempSync(join(tmpdir(), 'devcat-report-big-'));
+    const skillsRoot = join(bigHome, '.claude', 'skills');
+    mkdirSync(skillsRoot, { recursive: true });
+    for (let i = 0; i < 505; i++) {
+      const dir = join(skillsRoot, `skill-${String(i).padStart(4, '0')}`);
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'SKILL.md'), '# s\n');
+    }
+  });
+
+  afterAll(() => rmSync(bigHome, { recursive: true, force: true }));
+
+  async function runBig(json: boolean): Promise<{ out: string; err: string }> {
+    const previous = homedirHolder.current;
+    homedirHolder.current = bigHome;
+    try {
+      const { out, err } = await runAndCapture(false, json);
+      return { out, err };
+    } finally {
+      homedirHolder.current = previous;
+    }
+  }
+
+  it('warns on stderr, naming the root and the counts', async () => {
+    const { err } = await runBig(false);
+    expect(err).toContain('Truncated scan of');
+    expect(err).toContain(join(bigHome, '.claude', 'skills'));
+    expect(err).toContain('505 entries read');
+    expect(err).toContain('500 examined');
+  });
+
+  it('footnotes the terminal report instead of implying completeness', async () => {
+    const { out } = await runBig(false);
+    expect(out).toContain('truncated');
+    expect(out).toContain('some tools are not listed');
+  });
+
+  it('still warns on stderr under --json, leaving stdout parseable', async () => {
+    const { out, err } = await runBig(true);
+    const parsed = JSON.parse(out);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.truncations).toHaveLength(1);
+    expect(parsed.truncations[0].entries_seen).toBe(505);
+    expect(parsed.truncations[0].entries_kept).toBe(500);
+    expect(parsed.truncations[0].hit_read_ceiling).toBe(false);
+    expect(err).toContain('Truncated scan of');
   });
 });
