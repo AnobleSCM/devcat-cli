@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
+import { scanSkills } from './dirScan.js';
 import type { ToolEntry } from './index.js';
 
 interface CodexConfigToml {
@@ -15,7 +16,48 @@ interface SourceScan {
 }
 
 /**
- * Detect Codex MCP servers from config.toml.
+ * Detect Codex tooling: MCP servers from config.toml, plus installed skills
+ * under ~/.codex/skills (user scope only — Codex has no project skills root).
+ *
+ * Skills are frequently the same shelf Claude Code reads: both ~/.claude/skills
+ * and ~/.codex/skills are usually link farms pointing at one shared directory.
+ * Two dedupe passes handle that, and both are order-independent in effect:
+ *
+ *   - Within a root, scanSkills() collapses aliases by resolved path.
+ *   - Across clients, dedupe() collapses by (type, name), keeping the first
+ *     occurrence. detect() scans Claude Code before Codex, so a skill on both
+ *     shelves is listed once under Claude Code — deterministically, not by
+ *     whichever filesystem answered first.
+ */
+export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
+  const mcp = await detectCodexMcp(opts);
+  if (opts.scope !== 'user') return mcp;
+
+  const skills = await readCodexSkillsDir(join(homedir(), '.codex', 'skills'));
+  return {
+    tools: [...mcp.tools, ...skills.tools],
+    pathsScanned: [...mcp.pathsScanned, ...skills.pathsScanned],
+  };
+}
+
+/**
+ * Installed skills under a Codex `skills/` root. Report-only, like every
+ * skill entry — never part of the /api/sync payload (see syncableTools).
+ */
+async function readCodexSkillsDir(path: string): Promise<SourceScan> {
+  const hits = await scanSkills(path);
+  const tools: ToolEntry[] = hits.map((hit) => ({
+    type: 'skill' as const,
+    name: hit.name,
+    source: path,
+    scope: 'user' as const,
+    client: 'codex' as const,
+  }));
+  return { tools, pathsScanned: [path] };
+}
+
+/**
+ * Codex MCP servers from config.toml.
  *
  * User scope: reads ~/.codex/config.toml.
  * Project scope: walks CWD upward to find .codex/config.toml.
@@ -25,7 +67,7 @@ interface SourceScan {
  * (command, args, env, url, cwd, enabled) — we extract only the table key as
  * the tool name (CLI-05 manifest-only-sync).
  */
-export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
+async function detectCodexMcp(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
   let path: string | null;
   let scannedPath: string;
   if (opts.scope === 'user') {
