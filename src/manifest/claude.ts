@@ -111,6 +111,7 @@ async function readSkillsDir(path: string, scope: 'project' | 'user'): Promise<S
     source: path,
     scope,
     client: 'claude-code' as const,
+    canonicalPath: hit.realPath,
   }));
   return { tools, pathsScanned: [path] };
 }
@@ -124,6 +125,7 @@ async function readSubagentsDir(path: string, scope: 'project' | 'user'): Promis
     source: path,
     scope,
     client: 'claude-code' as const,
+    canonicalPath: hit.realPath,
   }));
   return { tools, pathsScanned: [path] };
 }

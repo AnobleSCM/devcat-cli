@@ -21,6 +21,13 @@ export interface ToolEntry {
   source: string;
   scope: 'project' | 'user';
   client: ToolClient;
+  /**
+   * Symlink-resolved location, for detections that are a folder or file on
+   * disk (skills, subagents). Absent for entries that are a key inside a
+   * config file, which have no path of their own. When present it is the
+   * dedupe identity — see dedupe().
+   */
+  canonicalPath?: string;
 }
 
 /**

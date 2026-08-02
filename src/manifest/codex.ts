@@ -52,6 +52,7 @@ async function readCodexSkillsDir(path: string): Promise<SourceScan> {
     source: path,
     scope: 'user' as const,
     client: 'codex' as const,
+    canonicalPath: hit.realPath,
   }));
   return { tools, pathsScanned: [path] };
 }

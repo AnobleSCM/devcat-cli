@@ -34,3 +34,54 @@ describe('dedupe', () => {
     expect(result).toHaveLength(2);
   });
 });
+
+describe('dedupe — canonical path identity', () => {
+  function skill(name: string, canonicalPath: string, client: ToolEntry['client']): ToolEntry {
+    return { type: 'skill', name, source: `/${client}/skills`, scope: 'user', client, canonicalPath };
+  }
+
+  it('collapses two DIFFERENTLY NAMED aliases of one canonical skill', () => {
+    // The link-farm case where the two shelves name the same target
+    // differently. (type, name) alone would let both survive.
+    const viaClaude = skill('panel', '/canon/skills/panel', 'claude-code');
+    const viaCodex = skill('panel-v2', '/canon/skills/panel', 'codex');
+
+    const result = dedupe([viaClaude, viaCodex]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.client).toBe('claude-code');
+    expect(result[0]!.name).toBe('panel');
+  });
+
+  it('keeps two DISTINCT skills that happen to share a name', () => {
+    // (type, name) alone would wrongly collapse these into one.
+    const claudePanel = skill('panel', '/canon/claude/panel', 'claude-code');
+    const codexPanel = skill('panel', '/canon/codex/panel', 'codex');
+
+    const result = dedupe([claudePanel, codexPanel]);
+    expect(result).toHaveLength(2);
+    expect(result.map((t) => t.client)).toEqual(['claude-code', 'codex']);
+  });
+
+  it('falls back to (type, name) for entries with no path of their own', () => {
+    // MCP servers are config keys — no canonicalPath, so name identity stands.
+    const a: ToolEntry = { type: 'mcp', name: 'context7', source: 'a', scope: 'project', client: 'claude-code' };
+    const b: ToolEntry = { type: 'mcp', name: 'context7', source: 'b', scope: 'user', client: 'cursor' };
+    expect(dedupe([a, b])).toHaveLength(1);
+  });
+
+  it('never lets a path key collide with a name key', () => {
+    const pathEntry = skill('x', 'skill::x', 'claude-code');
+    const nameEntry: ToolEntry = { type: 'skill', name: 'x', source: 's', scope: 'user', client: 'codex' };
+    expect(dedupe([pathEntry, nameEntry])).toHaveLength(2);
+  });
+
+  it('keeps first-occurrence order regardless of which identity applied', () => {
+    const entries: ToolEntry[] = [
+      skill('a', '/canon/a', 'claude-code'),
+      { type: 'mcp', name: 'b', source: 's', scope: 'user', client: 'codex' },
+      skill('a-alias', '/canon/a', 'codex'),
+      skill('c', '/canon/c', 'codex'),
+    ];
+    expect(dedupe(entries).map((t) => t.name)).toEqual(['a', 'b', 'c']);
+  });
+});
