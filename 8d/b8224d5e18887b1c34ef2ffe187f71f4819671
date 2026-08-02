@@ -1,0 +1,41 @@
+src/manifest/dirScan.ts
+  s_8ba42ddaefda86::t_b30c26a5b85305 19-21
+  s_8ba42ddaefda86::t_b02c35871824c3 54,56-60,72
+  s_3472e1f920dedf::t_791309933053da 87-91,100-101
+test/unit/manifest/dirScan.test.ts
+  s_8ba42ddaefda86::t_1916875e115b48 152-172
+  s_8ba42ddaefda86::t_91d05dd412f52d 112-130
+  s_208d0f555f2557::t_9e7c4754204a2d 173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "8db8224d5e18887b1c34ef2ffe187f71f4819671",
+  "prompts": {},
+  "sessions": {
+    "s_208d0f555f2557": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46277d43-e1e2-4df0-a9ab-beee650fe8d9",
+        "model": "claude-native-ui"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_3472e1f920dedf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d645dfa-1b36-4d96-bef5-274d1cd1f6b4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
