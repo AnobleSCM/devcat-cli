@@ -64,7 +64,7 @@ npx devcat-cli --markdown
 
 ## Script it
 
-`--json` prints the same scan as one JSON object — counts, per-client groups, and every path checked:
+`--json` prints the same scan as one JSON object — counts, per-client groups, and the scan locations it resolved:
 
 ```bash
 npx devcat-cli --json | jq '.clients[] | {label, total}'
@@ -119,20 +119,22 @@ So: config files are read and parsed, and the only thing taken **out of their co
 
 Nothing else inside a config is retained: environment variable values, command-line arguments, install paths, and every other field are dropped at the parser and never appear in any output. Missing and malformed files are skipped silently — a broken `.mcp.json` never fails the scan.
 
-Separately from file contents, the CLI records **where it looked**. Each entry keeps the config location it came from, its scope, its client, and — for skills and subagents — the resolved directory path used to deduplicate. Those are scan facts, not file contents. They appear in `--json` output (`paths_checked`, and the locations named in any truncation warning), and the scanned locations are listed in the terminal report when nothing is found. None of it is ever transmitted: see [Profile sync](#profile-sync) for the only thing that leaves the machine.
+Separately from file contents, the CLI records **where it looked**. Each entry keeps the config location it came from, its scope, its client, and — for skills and subagents — the resolved directory path used to deduplicate. Those are scan facts, not file contents. They appear in `--json` output (`paths_checked`, and the locations named in any truncation warning), and the same locations are listed in the terminal report when nothing is found.
 
-The directory scans are deliberately shallow and doubly bounded. They read a known config root and its immediate children and never recurse, so a symlink cannot lead the scan out into a large tree. Symlinks are resolved to a canonical path — these directories are usually link farms. Broken links, unreadable directories, and entries that disappear mid-scan are skipped.
+`paths_checked` is **the location each detector resolved to** — one per config file or directory it consulted, including candidates that turned out not to exist. It is not a trace of the upward walk: finding a project config stats a candidate at every ancestor directory, and those intermediate probes are not recorded. None of it is ever transmitted: see [Profile sync](#profile-sync) for the only thing that leaves the machine.
+
+The directory scans are deliberately shallow and doubly bounded. They read a known config root and its immediate children and never recurse, so a symlink cannot lead the scan out into a large tree. Symlinks are resolved to a canonical path — these directories are usually link farms. Broken links, unreadable directories, and entries that disappear mid-scan are skipped. A directory that errors partway through being read is reported as truncated too — a short list caused by an error is still a short list.
 
 | Bound | Value | Effect |
 |---|---|---|
 | Read ceiling | 10,000 entries | The directory is streamed, and reading stops there. The rest is never read. |
 | Examined per root | 500 entries | Of what was read, sorted alphabetically, the first 500 get the per-entry filesystem work. |
 
-Both are far above any real config directory. If either bites, **the CLI says so** rather than presenting a partial list as complete: a warning naming the root and the counts goes to stderr, the terminal and markdown reports carry a footnote, and `--json` gets a `truncated` flag plus a `truncations` array with `entries_seen`, `entries_kept`, and `hit_read_ceiling` per root.
+Both are far above any real config directory, and below them the result is fully deterministic. If either bites, **the CLI says so** rather than presenting a partial list as complete: a warning naming the root and the counts goes to stderr, the terminal and markdown reports carry a footnote, and `--json` gets a `truncated` flag plus a `truncations` array carrying, per root, `entries_read` (what the ceiling counts, dot-entries included), `entries_seen` (candidates among them), `entries_kept` (examined), `hit_read_ceiling`, and `read_failed`.
 
 Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root for any location that also has a user-scope reader — `~/.claude/skills`, `~/.claude/agents`, `~/.codex/config.toml`, `~/.cursor/mcp.json` — so those are never double-counted as project config. `~/.mcp.json` has no user-scope reader, so it is still picked up by the upward walk and reported as project-scoped.
 
-**A tool configured in more than one place is listed once.** Identity is deterministic, so the same machine always produces the same report:
+**A tool configured in more than one place is listed once.** Identity is deterministic, so an unchanged machine produces the same report every run — as long as no root hit the read ceiling. Above that ceiling, *which* 10,000 entries were read is the directory's enumeration order, which the CLI does not control; sorting happens after. A run in that state says so rather than implying stability it does not have.
 
 - Anything found as a folder — skills, subagents — is identified by its **resolved symlink target**. Two links to one directory are one entry however they are named, and two genuinely different skills that happen to share a name both survive.
 - MCP servers and plugins are keys in a config file with no path of their own, so they are identified by (type, name) — the same identity the server matches on.
@@ -174,7 +176,7 @@ Sync sends MCP servers and plugins only. Skills and subagents are local report d
 - **Nothing leaves your machine on the default command.** The scan is local; `npx devcat-cli` makes no network request at all.
 - **Nothing inside a config file is retained but the tool's name.** Environment variable values, command-line arguments, install paths, and every other field are discarded at the parser — they reach no output and no payload.
 - **Skill and subagent files are never opened at all** — those scans only list directories and check that an expected filename exists.
-- **Local output does include local paths.** `--json` reports the locations checked, and truncation warnings name the oversized directory. That is scan provenance, printed on your own terminal; it is not transmitted.
+- **Local output does include local paths.** `--json` reports the resolved scan locations, and truncation warnings name the oversized directory. That is scan provenance, printed on your own terminal; it is not transmitted.
 - **Only `{type, name}` for MCP servers and plugins is ever sent**, and only by `devcat sync`. A test asserts this on the wire: it plants secrets throughout a fixture machine — including inside a `SKILL.md` body and a subagent file — runs the actual sync against an interceptor, and inspects the received bytes rather than a reconstruction of them.
 - **Tokens live in the OS keychain**, no plaintext fallback, and bearer tokens are redacted from `--verbose` output.
 - **Source is public** — read every line at [github.com/AnobleSCM/devcat-cli](https://github.com/AnobleSCM/devcat-cli).
