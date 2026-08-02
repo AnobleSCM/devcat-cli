@@ -28,7 +28,7 @@ Codex · 3 tools
 Cursor · 2 tools
     2 mcp      figma, postgres
 
-23 tools in Claude Code, Codex, and Cursor · 12 config files checked
+23 tools in Claude Code, Codex, and Cursor · 13 locations checked
 2 project-scoped · 21 user-wide
 ```
 
@@ -106,22 +106,28 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ## What it reads
 
-Config files and directory names only — never file contents:
+Two kinds of location, read two different ways:
 
-- **Claude Code** — `~/.claude.json`, `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, `~/.claude/skills/`, `~/.claude/agents/`, and their project equivalents (`.mcp.json`, `.claude/skills/`, `.claude/agents/`)
-- **Codex CLI** — `.codex/config.toml` (project), `~/.codex/config.toml`, `~/.codex/skills/`
-- **Cursor** — `.cursor/mcp.json` (project), `~/.cursor/mcp.json`
+| | Where | How |
+|---|---|---|
+| **MCP servers** | Claude Code `~/.claude.json`, `~/.claude/settings.json`, `.mcp.json` (project) · Codex `~/.codex/config.toml`, `.codex/config.toml` (project) · Cursor `~/.cursor/mcp.json`, `.cursor/mcp.json` (project) | The file is read and parsed. Only the server **names** (the keys) are kept. |
+| **Plugins** | Claude Code `~/.claude/plugins/installed_plugins.json` | Same — parsed, keys kept. |
+| **Skills** | Claude Code `~/.claude/skills/`, `.claude/skills/` (project) · Codex `~/.codex/skills/` | The directory is listed. A child counts as a skill if it contains a `SKILL.md`. **No file is opened** — not even the `SKILL.md`, whose presence is all that is checked. The name is the folder's. |
+| **Subagents** | Claude Code `~/.claude/agents/`, `.claude/agents/` (project) | The directory is listed. Two shapes count: `<name>.md`, where the name is the file's; and `<name>/<name>.md`, where the name is the folder's and the inner filename must match. A folder holding only other markdown — a README, notes — is not a subagent. **No file is opened.** |
 
-Skills and subagents are folders, so they are found by listing a directory rather than parsing a file. That scan is deliberately shallow: it reads the config root and its immediate children, never recurses, resolves symlinks to dedupe the link-farm layouts these directories usually use, and skips broken links, unreadable folders, and anything without a `SKILL.md`. Skill and subagent **names come from the folder name** — no file is opened.
+So: config files are read and parsed, and nothing but the names inside them is kept. Directory scans open nothing at all.
 
-It never reads or reports environment variable values, command-line arguments, file paths, file contents, or any field other than the tool name and type. Missing and malformed config files are skipped silently — a broken `.mcp.json` never fails the scan.
+Either way, what leaves those locations is the tool's **name and type** and nothing else — no environment variable values, no command-line arguments, no file contents, no other field. Missing and malformed files are skipped silently: a broken `.mcp.json` never fails the scan.
+
+The directory scans are deliberately shallow. They read a known config root and its immediate children and never recurse, so a symlink cannot lead the scan out into a large tree. Symlinks are resolved to a canonical path — these directories are usually link farms. Broken links, unreadable directories, and entries that disappear mid-scan are skipped. The number of children examined per root is capped, and the cap is applied after sorting, so the same machine always yields the same result.
 
 Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root, so your user-wide config is never double-counted as project config.
 
-**A tool configured in more than one place is listed once.** Two passes decide where it lands, and both are deterministic — the same machine always produces the same report:
+**A tool configured in more than one place is listed once.** Identity is deterministic, so the same machine always produces the same report:
 
-- Within one directory, aliases are collapsed by resolved symlink target. Two links to the same skill are one skill.
-- Across clients, the first occurrence wins, in a fixed scan order: project before user, and Claude Code before Codex before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory, so a skill on both shelves is listed once under Claude Code. A skill only Codex has still appears under Codex.
+- Anything found as a folder — skills, subagents — is identified by its **resolved symlink target**. Two links to one directory are one entry however they are named, and two genuinely different skills that happen to share a name both survive.
+- MCP servers and plugins are keys in a config file with no path of their own, so they are identified by (type, name) — the same identity the server matches on.
+- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory, so a skill on both shelves is listed once under Claude Code. A skill only Codex has still appears under Codex.
 
 Install it globally if you run it often:
 
@@ -157,7 +163,9 @@ Sync sends MCP servers and plugins only. Skills and subagents are local report d
 ## Security
 
 - **Nothing leaves your machine on the default command.** The scan is local; `npx devcat-cli` makes no network request at all.
-- **No env vars, no command args, no paths, no file contents** are read out of your configs — only tool names and types. A unit test proves this for every release.
+- **Only names and types are kept.** Config files are parsed, but environment variable values, command-line arguments, paths, and every other field are discarded — they never enter the report, the markdown, the JSON, or a sync payload.
+- **Skill and subagent files are never opened at all** — those scans only list directories and check that an expected filename exists.
+- **A test asserts the real request body.** It plants secrets throughout a fixture machine, including inside a `SKILL.md` and a subagent file, runs the actual sync, and inspects the bytes that reached the wire — not a reconstruction of them.
 - **Tokens live in the OS keychain**, no plaintext fallback, and bearer tokens are redacted from `--verbose` output.
 - **Source is public** — read every line at [github.com/AnobleSCM/devcat-cli](https://github.com/AnobleSCM/devcat-cli).
 
