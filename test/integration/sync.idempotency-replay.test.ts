@@ -29,6 +29,9 @@ vi.mock('@napi-rs/keyring', () => {
 });
 
 process.env.NO_COLOR = '1';
+// This suite exercises the live sync path against msw, so it opts past the
+// devcat.dev-is-down pause gate in commands/sync.ts.
+process.env.DEVCAT_SYNC_ENABLED = '1';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {

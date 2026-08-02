@@ -47,6 +47,23 @@ export interface SyncOptions {
 }
 
 /**
+ * devcat.dev is being rebuilt, so the hosted sync endpoint is not answering.
+ * Sync stops on the one line below instead of running the device flow and
+ * failing deep inside an HTTP call — no browser, no polling, no retries.
+ *
+ * The whole sync path underneath is untouched and still compiles. Set
+ * DEVCAT_SYNC_ENABLED=1 to run it anyway (integration tests do this, as does
+ * anyone pointing DEVCAT_API_URL at their own host). Delete this gate when
+ * devcat.dev is back.
+ */
+const SYNC_PAUSED_MESSAGE =
+  'Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.';
+
+function isSyncPaused(): boolean {
+  return process.env.DEVCAT_SYNC_ENABLED !== '1';
+}
+
+/**
  * Top-level `devcat sync` orchestrator.
  *
  * Order:
@@ -60,6 +77,11 @@ export interface SyncOptions {
  *   5. Render success summary (Phase 40 D-19).
  */
 export async function runSync(opts: SyncOptions): Promise<ExitCode> {
+  if (isSyncPaused()) {
+    writeErrorOutput({ message: SYNC_PAUSED_MESSAGE, exitCode: EXIT_GENERIC_ERROR });
+    return EXIT_GENERIC_ERROR;
+  }
+
   // 1. Detect manifest
   const manifest = await detect(process.cwd());
   if (manifest.tools.length === 0) {
