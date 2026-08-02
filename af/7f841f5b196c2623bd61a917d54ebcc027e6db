@@ -1,0 +1,44 @@
+test/integration/report.test.ts
+  s_8ba42ddaefda86::t_be4bcef120b89a 102-103,107-108,112,114-120
+  s_8ba42ddaefda86::t_7494c3dbc3056e 139,142-143,148-194
+  s_8ba42ddaefda86::t_884486e3851b3a 2
+  s_8ba42ddaefda86::t_1de9d9b7100bc3 44-61
+  s_8ba42ddaefda86::t_bcf5f5bedbccff 195
+test/unit/ui/report.test.ts
+  s_8ba42ddaefda86::t_eda6b705fbf758 104-108
+  s_8ba42ddaefda86::t_71ffbe493137eb 2-7
+  s_8ba42ddaefda86::t_bc169cdd6289dd 42-43,47-48,67,73,80-82,86,133,137-138
+  s_8ba42ddaefda86::t_f64f784e220e47 202
+  s_8ba42ddaefda86::t_3e9dd691f5ab5f 164-201,203
+  s_8ba42ddaefda86::t_0597b9cd7f7151 29-30
+  s_bc4dad47ab7e93::t_1b881efde4d98f 204
+src/bin/devcat.ts
+  s_8ba42ddaefda86::t_5f5991fda3148d 28
+  s_8ba42ddaefda86::t_8c23228d331600 14
+src/commands/report.ts
+  s_8ba42ddaefda86::t_1899427b10fcb3 2-3,17-20,24-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "af7f841f5b196c2623bd61a917d54ebcc027e6db",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_bc4dad47ab7e93": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6612a7f3-56cf-4a5a-8415-a85a40b14ff8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
