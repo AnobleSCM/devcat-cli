@@ -131,9 +131,11 @@ describe('scanSkills', () => {
     // The dropped 20 must be disclosed, not silently missing.
     expect(first.truncation).toEqual({
       root,
+      entriesRead: 520,
       entriesSeen: 520,
       entriesKept: 500,
       hitReadCeiling: false,
+      readFailed: false,
     });
   });
 

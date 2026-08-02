@@ -50,12 +50,21 @@ export interface DirHit {
 /** Emitted when a bound bit, so every output layer can disclose it. */
 export interface RootTruncation {
   root: string;
-  /** Candidate names actually read from the directory. */
+  /**
+   * Directory entries pulled, including dot-entries. This is what the read
+   * ceiling bounds, so it is the number the ceiling message must quote —
+   * quoting candidates instead lets a dot-heavy root claim "0 entries read"
+   * in the same breath as "ceiling reached".
+   */
+  entriesRead: number;
+  /** Of those, the non-dot candidate names worth examining. */
   entriesSeen: number;
-  /** Of those, how many were examined (the rest were dropped by the cap). */
+  /** Of the candidates, how many were examined (the rest dropped by the cap). */
   entriesKept: number;
-  /** True when reading stopped at READ_CEILING — more names exist, unread. */
+  /** True when reading stopped at READ_CEILING — more entries exist, unread. */
   hitReadCeiling: boolean;
+  /** True when the directory errored partway; the list is short for that reason. */
+  readFailed: boolean;
 }
 
 export interface DirScanResult {
@@ -112,12 +121,17 @@ export async function scanSubagents(
 }
 
 /**
- * Read up to READ_CEILING candidate names out of `root`, streaming.
+ * Read up to `readCeiling` entries out of `root`, streaming.
  *
- * opendir yields entries lazily, so hitting the ceiling means the remainder
- * of a pathological directory is never read — the bound is on the work done,
- * not just on the result. Dot-entries are skipped but still count toward the
- * ceiling, so a directory full of them cannot spin forever either.
+ * The ceiling gates BEFORE each pull, using a manual iterator rather than
+ * `for await`: `for await` fetches the next entry and only then runs the
+ * body, so a top-of-loop check there would already have read one entry past
+ * the limit. Breaking early calls the iterator's return(), which closes the
+ * directory handle, so the remainder is genuinely never read.
+ *
+ * Dot-entries are skipped as candidates but still consume the ceiling — a
+ * directory full of them cannot spin. That is why two counts come back:
+ * `read` is what the ceiling bounds, `names` is what is worth examining.
  *
  * Returns null when the root cannot be opened at all (missing, or no
  * permission) — indistinguishable outcomes, both meaning "nothing here".
@@ -125,7 +139,7 @@ export async function scanSubagents(
 async function readCandidateNames(
   root: string,
   readCeiling: number,
-): Promise<{ names: string[]; hitReadCeiling: boolean } | null> {
+): Promise<{ names: string[]; read: number; hitReadCeiling: boolean; readFailed: boolean } | null> {
   let dir;
   try {
     dir = await opendir(root);
@@ -134,23 +148,32 @@ async function readCandidateNames(
   }
 
   const names: string[] = [];
-  let iterated = 0;
+  let read = 0;
   let hitReadCeiling = false;
+  let readFailed = false;
+
+  const iterator = dir[Symbol.asyncIterator]();
   try {
-    for await (const entry of dir) {
-      if (iterated >= readCeiling) {
+    for (;;) {
+      if (read >= readCeiling) {
         hitReadCeiling = true;
+        await iterator.return?.();
         break;
       }
-      iterated += 1;
-      if (entry.name.startsWith('.')) continue;
-      names.push(entry.name);
+      const next = await iterator.next();
+      if (next.done) break;
+      read += 1;
+      const name = next.value.name;
+      if (name.startsWith('.')) continue;
+      names.push(name);
     }
   } catch {
-    // A directory that vanishes or errors mid-iteration still yields whatever
-    // was read. The async iterator closes the handle on the way out.
+    // The directory vanished or errored partway. Whatever was read is still
+    // usable, but the caller must be told the list is short for a reason.
+    readFailed = true;
   }
-  return { names, hitReadCeiling };
+
+  return { names, read, hitReadCeiling, readFailed };
 }
 
 /**
@@ -192,12 +215,14 @@ async function scanRoot(
 
   const droppedByCap = sorted.length > candidates.length;
   const truncation: RootTruncation | null =
-    droppedByCap || read.hitReadCeiling
+    droppedByCap || read.hitReadCeiling || read.readFailed
       ? {
           root,
+          entriesRead: read.read,
           entriesSeen: sorted.length,
           entriesKept: candidates.length,
           hitReadCeiling: read.hitReadCeiling,
+          readFailed: read.readFailed,
         }
       : null;
 
