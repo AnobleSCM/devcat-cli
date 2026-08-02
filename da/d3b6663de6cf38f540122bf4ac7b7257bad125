@@ -1,0 +1,23 @@
+src/manifest/dirScan.ts
+  s_8ba42ddaefda86::t_eb0549edf62dd4 53-60,62,64,66-67,124,126-134,142,151,153-155,157-158,160,163-168,171-173,175-176,218,221,225
+test/unit/manifest/readCeiling.test.ts
+  s_8ba42ddaefda86::t_0e787efbc20d7a 1-128
+test/unit/manifest/dirScan.test.ts
+  s_8ba42ddaefda86::t_7132ae10f681df 134,138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "dad3b6663de6cf38f540122bf4ac7b7257bad125",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
