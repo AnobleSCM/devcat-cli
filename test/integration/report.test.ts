@@ -75,7 +75,10 @@ afterAll(() => {
   rmSync(projectDir, { recursive: true, force: true });
 });
 
-async function runAndCapture(markdown: boolean): Promise<{ exitCode: number; out: string }> {
+async function runAndCapture(
+  markdown: boolean,
+  json = false,
+): Promise<{ exitCode: number; out: string }> {
   const chunks: string[] = [];
   const writeSpy = vi
     .spyOn(process.stdout, 'write')
@@ -86,7 +89,7 @@ async function runAndCapture(markdown: boolean): Promise<{ exitCode: number; out
   const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(projectDir);
   try {
     const { runReport } = await import('../../src/commands/report.js');
-    const exitCode = await runReport({ markdown });
+    const exitCode = await runReport({ markdown, json });
     return { exitCode, out: chunks.join('') };
   } finally {
     writeSpy.mockRestore();
@@ -147,22 +150,8 @@ describe('report — default command', () => {
 });
 
 describe('report — --json', () => {
-  const originalArgv = process.argv;
-
-  async function runJson(extraArgs: string[]): Promise<{ exitCode: number; out: string }> {
-    process.argv = ['node', 'devcat', ...extraArgs];
-    const { resetJsonModeCacheForTests } = await import('../../src/ui/jsonStream.js');
-    resetJsonModeCacheForTests();
-    try {
-      return await runAndCapture(extraArgs.includes('--markdown'));
-    } finally {
-      process.argv = originalArgv;
-      resetJsonModeCacheForTests();
-    }
-  }
-
   it('emits one parseable JSON object mirroring the report', async () => {
-    const { exitCode, out } = await runJson(['--json']);
+    const { exitCode, out } = await runAndCapture(false, true);
 
     expect(exitCode).toBe(0);
     const parsed = JSON.parse(out);
@@ -187,8 +176,8 @@ describe('report — --json', () => {
     expect(out.trimEnd().split('\n').filter((l) => l === '}')).toHaveLength(1);
   });
 
-  it('wins over --markdown when both are passed', async () => {
-    const { out } = await runJson(['--json', '--markdown']);
+  it('wins over --markdown', async () => {
+    const { out } = await runAndCapture(true, true);
     expect(() => JSON.parse(out)).not.toThrow();
     expect(out).not.toContain('## My AI stack');
   });

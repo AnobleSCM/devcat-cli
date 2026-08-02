@@ -1,11 +1,12 @@
 import { detect } from '../manifest/index.js';
 import { renderStackReport, renderStackMarkdown, renderStackJson } from '../ui/report.js';
-import { isJsonMode } from '../ui/jsonStream.js';
 import { EXIT_OK, type ExitCode } from '../lib/exitCodes.js';
 
 export interface ReportOptions {
   /** Emit the shareable "My AI stack" markdown snippet instead of the terminal report. */
   markdown: boolean;
+  /** Emit one machine-readable JSON object. Comes from commander, not process.argv. */
+  json: boolean;
 }
 
 /**
@@ -22,7 +23,7 @@ export interface ReportOptions {
 export async function runReport(opts: ReportOptions): Promise<ExitCode> {
   const manifest = await detect(process.cwd());
   let out: string;
-  if (isJsonMode()) {
+  if (opts.json) {
     out = renderStackJson(manifest);
   } else if (opts.markdown) {
     out = renderStackMarkdown(manifest);
