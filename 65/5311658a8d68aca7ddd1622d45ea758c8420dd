@@ -1,0 +1,21 @@
+README.md
+  s_8ba42ddaefda86::t_5783b33fa14827 168
+  s_8ba42ddaefda86::t_c93d189d33b4fb 119-124
+  s_8ba42ddaefda86::t_f2b9a76ce80790 112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "655311658a8d68aca7ddd1622d45ea758c8420dd",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
