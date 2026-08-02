@@ -220,14 +220,28 @@ describe('truncation disclosure', () => {
     tools: [tool({ name: 'context7' })],
     pathsScanned: ['~/.claude/skills'],
     truncations: [
-      { root: '~/.claude/skills', entriesSeen: 520, entriesKept: 500, hitReadCeiling: false },
+      {
+        root: '~/.claude/skills',
+        entriesRead: 520,
+        entriesSeen: 520,
+        entriesKept: 500,
+        hitReadCeiling: false,
+        readFailed: false,
+      },
     ],
   };
 
   const CEILINGED: DetectResult = {
     ...TRUNCATED,
     truncations: [
-      { root: '~/.claude/skills', entriesSeen: 10000, entriesKept: 500, hitReadCeiling: true },
+      {
+        root: '~/.claude/skills',
+        entriesRead: 10000,
+        entriesSeen: 9998,
+        entriesKept: 500,
+        hitReadCeiling: true,
+        readFailed: false,
+      },
     ],
   };
 
@@ -254,9 +268,11 @@ describe('truncation disclosure', () => {
     expect(parsed.truncations).toEqual([
       {
         root: '~/.claude/skills',
+        entries_read: 520,
         entries_seen: 520,
         entries_kept: 500,
         hit_read_ceiling: false,
+        read_failed: false,
       },
     ]);
   });
@@ -267,23 +283,92 @@ describe('truncation disclosure', () => {
     expect(parsed.truncations).toEqual([]);
   });
 
+  it('the empty-state terminal report still discloses truncation', () => {
+    // Early-returning on "no tools" skipped the footnote entirely, so a
+    // truncated scan that found nothing claimed nothing was installed.
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: ['~/.claude/skills'],
+      truncations: TRUNCATED.truncations,
+    });
+    expect(out).toContain('No AI tooling detected.');
+    expect(out).toContain('1 location was truncated');
+    expect(out).toContain('some tools are not listed');
+  });
+
+  it('the empty-state markdown still discloses truncation', () => {
+    const out = renderStackMarkdown({
+      tools: [],
+      pathsScanned: ['~/.claude/skills'],
+      truncations: TRUNCATED.truncations,
+    });
+    expect(out).toContain('No AI tooling detected on this machine yet.');
+    expect(out).toContain('truncated');
+    expect(out).toContain('some tools are not listed');
+  });
+
+  it('an untruncated empty scan says nothing about truncation', () => {
+    const empty = { tools: [], pathsScanned: ['~/.claude.json'], truncations: [] };
+    expect(renderStackReport(empty)).not.toContain('truncated');
+    expect(renderStackMarkdown(empty)).not.toContain('truncated');
+  });
+
+  it('the warning discloses a read failure rather than looking like a clean short list', () => {
+    const [warning] = truncationWarnings([
+      {
+        root: '~/.claude/skills',
+        entriesRead: 3,
+        entriesSeen: 3,
+        entriesKept: 3,
+        hitReadCeiling: false,
+        readFailed: true,
+      },
+    ]);
+    expect(warning).toContain('reading failed after 3 entries');
+    expect(warning).toContain('Some tools are not listed');
+  });
+
+  it('a dot-heavy ceiling hit reports coherent numbers', () => {
+    // entriesSeen is 0 (no candidates) but the ceiling counted 10000 entries.
+    // The message must not say "0 entries read" and "ceiling reached".
+    const [warning] = truncationWarnings([
+      {
+        root: '~/.claude/skills',
+        entriesRead: 10000,
+        entriesSeen: 0,
+        entriesKept: 0,
+        hitReadCeiling: true,
+        readFailed: false,
+      },
+    ]);
+    expect(warning).toContain('after 10000 entries');
+    expect(warning).not.toContain('0 entries read');
+  });
+
   it('the stderr warning names the root and the counts', () => {
     const [warning] = truncationWarnings(TRUNCATED.truncations);
     expect(warning).toContain('~/.claude/skills');
     expect(warning).toContain('520 entries read');
-    expect(warning).toContain('500 examined');
+    expect(warning).toContain('520 candidates, 500 examined');
     expect(warning).not.toContain('ceiling');
   });
 
   it('the stderr warning says so when the read ceiling was hit', () => {
     const [warning] = truncationWarnings(CEILINGED.truncations);
     expect(warning).toContain('10000-entry ceiling');
-    expect(warning).toContain('more may exist unread');
+    expect(warning).toContain('More may exist unread');
   });
 
   it('sanitizes a hostile root path in the warning', () => {
     const [warning] = truncationWarnings([
-      { root: 'evil\u001b[31m/skills', entriesSeen: 600, entriesKept: 500, hitReadCeiling: false },
+      {
+        root: 'evil\u001b[31m/skills',
+        entriesRead: 600,
+        entriesSeen: 600,
+        entriesKept: 500,
+        hitReadCeiling: false,
+        readFailed: false,
+      },
     ]);
     // eslint-disable-next-line no-control-regex
     expect(warning).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);

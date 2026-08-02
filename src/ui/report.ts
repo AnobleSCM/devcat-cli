@@ -110,7 +110,7 @@ export function groupStack(tools: readonly ToolEntry[]): StackGroup[] {
  *   3 project-scoped · 18 user-wide
  */
 export function renderStackReport(result: DetectResult): string {
-  if (result.tools.length === 0) return renderEmptyStack(result.pathsScanned);
+  if (result.tools.length === 0) return renderEmptyStack(result);
 
   const groups = groupStack(result.tools);
   const total = result.tools.length;
@@ -174,12 +174,24 @@ export function truncationFootnote(truncations: readonly RootTruncation[]): stri
  */
 export function truncationWarnings(truncations: readonly RootTruncation[]): string[] {
   return truncations.map((t) => {
-    const ceiling = t.hitReadCeiling
-      ? ` Reading stopped at the ${READ_CEILING}-entry ceiling, so more may exist unread.`
-      : '';
-    return `! Truncated scan of ${sanitizeName(t.root)} — ${t.entriesSeen} entries read, ${t.entriesKept} examined. Some tools are not listed.${ceiling}`;
+    const parts = [`! Truncated scan of ${sanitizeName(t.root)} —`];
+    if (t.hitReadCeiling) {
+      // Quote entriesRead, not entriesSeen: the ceiling counts every entry
+      // including dot-entries, so a dot-heavy root would otherwise report
+      // "0 entries read" in the same line as "ceiling reached".
+      parts.push(`reading stopped at the ${READ_CEILING}-entry ceiling after ${t.entriesRead} entries,`);
+    } else if (t.readFailed) {
+      parts.push(`reading failed after ${t.entriesRead} entries,`);
+    } else {
+      parts.push(`${t.entriesRead} entries read,`);
+    }
+    parts.push(`${t.entriesSeen} candidates, ${t.entriesKept} examined.`);
+    parts.push('Some tools are not listed.');
+    if (t.hitReadCeiling) parts.push('More may exist unread.');
+    return parts.join(' ');
   });
 }
+
 
 /**
  * Shareable snippet for a README or gist. Plain markdown, no ANSI, stable
@@ -190,6 +202,10 @@ export function renderStackMarkdown(result: DetectResult): string {
 
   if (result.tools.length === 0) {
     lines.push('No AI tooling detected on this machine yet.');
+    if (result.truncations.length > 0) {
+      lines.push('');
+      lines.push(`> ${truncationFootnote(result.truncations)}`);
+    }
     lines.push('');
     lines.push(MARKDOWN_FOOTER);
     return lines.join('\n');
@@ -249,9 +265,11 @@ export function renderStackJson(result: DetectResult): string {
     truncated: result.truncations.length > 0,
     truncations: result.truncations.map((t) => ({
       root: t.root,
+      entries_read: t.entriesRead,
       entries_seen: t.entriesSeen,
       entries_kept: t.entriesKept,
       hit_read_ceiling: t.hitReadCeiling,
+      read_failed: t.readFailed,
     })),
   };
   return JSON.stringify(payload, null, 2);
@@ -264,16 +282,26 @@ const MARKDOWN_FOOTER =
  * Nothing found. Print the paths that were checked so the user can spot the
  * config location the CLI does not know about yet.
  */
-function renderEmptyStack(pathsScanned: string[]): string {
-  const list = pathsScanned.map((p) => `  - ${sanitizeName(p)}`).join('\n');
-  return [
+function renderEmptyStack(result: DetectResult): string {
+  const list = result.pathsScanned.map((p) => `  - ${sanitizeName(p)}`).join('\n');
+  const lines = [
     `${SUCCESS_GLYPH} ${c.bold('No AI tooling detected.')}`,
     '',
     'Looked in:',
     list,
-    '',
-    c.dim('Add an MCP server to Claude Code, Codex, or Cursor and run this again.'),
-  ].join('\n');
+  ];
+
+  // A truncated scan that turned up nothing is NOT "nothing is installed" —
+  // it is "we stopped looking". Saying the first would be a lie by omission,
+  // and this is the path where it would be least visible.
+  if (result.truncations.length > 0) {
+    lines.push('');
+    lines.push(c.yellow(truncationFootnote(result.truncations)));
+  }
+
+  lines.push('');
+  lines.push(c.dim('Add an MCP server to Claude Code, Codex, or Cursor and run this again.'));
+  return lines.join('\n');
 }
 
 /**
