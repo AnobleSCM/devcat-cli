@@ -18,6 +18,17 @@
 /** Tool type values accepted by /api/sync. Server rejects 'subagent' and 'agent'. */
 export type ToolType = 'mcp' | 'skill' | 'plugin';
 
+/**
+ * The types this CLI actually sends: the two the devcat.dev catalog matches.
+ *
+ * Narrower than ToolType on purpose. Skills are a valid server-side type but
+ * are detected here as local folders with no catalog entry behind them, so
+ * they stay local — see syncableTools() in manifest/index.ts. Everything on
+ * the request path is typed with this, which is what makes handing an
+ * unfiltered detection list to postSync a compile error.
+ */
+export type SyncableToolType = Extract<ToolType, 'mcp' | 'plugin'>;
+
 /** Single tool entry in the /api/sync request payload. */
 export interface ToolEntry {
   type: ToolType;

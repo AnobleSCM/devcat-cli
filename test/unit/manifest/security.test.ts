@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import type { SyncRequestBody } from '../../../src/types/api.js';
 
 /**
@@ -23,6 +25,90 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
+// A stored token, so runSync goes straight to the request without a device flow.
+const { mockGetPassword, mockSetPassword } = vi.hoisted(() => ({
+  mockGetPassword: vi.fn(),
+  mockSetPassword: vi.fn(),
+}));
+
+vi.mock('@napi-rs/keyring', () => {
+  class AsyncEntry {
+    constructor(_service: string, _account: string) {}
+    getPassword(): Promise<string | null> {
+      return mockGetPassword();
+    }
+    setPassword(value: string): Promise<void> {
+      return mockSetPassword(value);
+    }
+    deletePassword(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+  return { AsyncEntry };
+});
+
+vi.mock('open', () => ({ default: vi.fn().mockResolvedValue(undefined) }));
+
+// This suite drives the live sync path on purpose — it is asserting what
+// leaves the machine — so it opts past the devcat.dev-is-down pause gate.
+process.env.DEVCAT_SYNC_ENABLED = '1';
+process.env.NO_COLOR = '1';
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+let tmpHome: string;
+
+/**
+ * Run the real `devcat sync` against the fixture tree and hand back the exact
+ * JSON body msw received. Nothing is reconstructed by hand: runSync detects,
+ * filters, and serialises; this only observes.
+ */
+async function captureSyncRequest(): Promise<{ body: SyncRequestBody }> {
+  let captured: SyncRequestBody | null = null;
+  server.use(
+    http.post('https://devcat.dev/api/sync', async ({ request }) => {
+      captured = (await request.json()) as SyncRequestBody;
+      return HttpResponse.json({
+        synced_at: '2026-04-27T12:00:00Z',
+        session_id: 'sess',
+        results: [],
+        counts: { exact: 0, fuzzy: 0, unmatched: 0 },
+      });
+    }),
+  );
+
+  mockGetPassword.mockResolvedValue(
+    JSON.stringify({
+      access_token: 'eyJa',
+      refresh_token: 'eyJr',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    }),
+  );
+  mockSetPassword.mockResolvedValue(undefined);
+
+  const { resetTokenStoreForTests } = await import('../../../src/auth/tokenStore.js');
+  resetTokenStoreForTests();
+
+  const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpHome);
+  try {
+    const { runSync } = await import('../../../src/commands/sync.js');
+    const exitCode = await runSync({ noOpen: true });
+    expect(exitCode).toBe(0);
+  } finally {
+    writeSpy.mockRestore();
+    cwdSpy.mockRestore();
+  }
+
+  expect(captured, 'no request reached /api/sync').not.toBeNull();
+  return { body: captured! };
+}
+
 /**
  * CLI-05 success criterion 4 (ROADMAP Phase 39):
  *   "The manifest payload sent to /api/sync contains only {type, name}
@@ -40,8 +126,6 @@ vi.mock('node:os', async (importOriginal) => {
  * vacuously true.
  */
 describe('manifest-only-sync (CLI-05)', () => {
-  let tmpHome: string;
-
   beforeAll(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-sec-'));
 
@@ -167,33 +251,24 @@ describe('manifest-only-sync (CLI-05)', () => {
     'SETTINGS_SECRET',
   ] as const;
 
-  it('PRIMARY: the actual /api/sync payload {tools: [{type, name}]} has zero secret substrings', async () => {
-    // W3 fix: this is the load-bearing assertion — `result.tools` includes a
-    // `source` path field that's only used for --json terminal output and is
-    // NEVER sent to the server. The payload going to the server is just
-    // {type, name} pairs.
-    const { detect, syncableTools } = await import('../../../src/manifest/index.js');
-    const result = await detect(tmpHome);
+  it('PRIMARY: the real request body sent by runSync has zero secret substrings', async () => {
+    // Load-bearing assertion. Nothing here reconstructs a payload by hand:
+    // runSync does its own detection and filtering, postSync serialises the
+    // body, and msw hands back the exact bytes that went over the wire.
+    const { body } = await captureSyncRequest();
 
-    // Sanity check — proves all 3 ecosystems' fixtures were loaded
-    // (without this guard, an empty result.tools makes the assertion vacuous)
-    expect(result.tools.length).toBeGreaterThanOrEqual(7);
-    const names = result.tools.map((t) => t.name);
-    expect(names).toContain('context7');     // Claude project
-    expect(names).toContain('linear-mcp');   // Claude project
-    expect(names).toContain('github');       // Claude user (.claude.json)
+    // Sanity check — proves all 3 ecosystems' fixtures reached the payload
+    // (without this guard an empty tools array makes the assertion vacuous).
+    const names = body.tools.map((t) => t.name);
+    expect(names).toContain('context7');      // Claude project
+    expect(names).toContain('linear-mcp');    // Claude project
+    expect(names).toContain('github');        // Claude user (.claude.json)
     expect(names).toContain('settings-only'); // Claude user (settings.json)
-    expect(names).toContain('swift-lsp');    // Claude user (plugins, '@'-split)
-    expect(names).toContain('openai-tools'); // Codex user (B2 — was missing)
-    expect(names).toContain('supabase');     // Cursor user (B2 — was missing)
+    expect(names).toContain('swift-lsp');     // Claude user (plugins, '@'-split)
+    expect(names).toContain('openai-tools');  // Codex user
+    expect(names).toContain('supabase');      // Cursor user
 
-    // Build the exact payload shape that gets POSTed to /api/sync. syncableTools()
-    // is what runSync passes to postSync; the compiler rejects the unfiltered list.
-    const payload: Pick<SyncRequestBody, 'tools'> = {
-      tools: syncableTools(result.tools).map((t) => ({ type: t.type, name: t.name })),
-    };
-    const payloadJson = JSON.stringify(payload);
-
+    const payloadJson = JSON.stringify(body);
     for (const forbidden of FORBIDDEN_SUBSTRINGS) {
       expect(
         payloadJson,
@@ -202,23 +277,35 @@ describe('manifest-only-sync (CLI-05)', () => {
     }
   });
 
-  it('skills and subagents are detected locally but NEVER enter the sync payload', async () => {
-    const { detect, syncableTools } = await import('../../../src/manifest/index.js');
-    const result = await detect(tmpHome);
+  it('the wire payload carries ONLY manifest_hash and {type, name} tools', async () => {
+    const { body } = await captureSyncRequest();
+
+    expect(Object.keys(body).sort()).toEqual(['manifest_hash', 'tools']);
+    expect(body.manifest_hash).toMatch(/^[a-f0-9]{64}$/);
+    for (const entry of body.tools) {
+      // No source, no scope, no client, no canonicalPath — local-only fields.
+      expect(Object.keys(entry).sort()).toEqual(['name', 'type']);
+    }
+  });
+
+  it('skills and subagents are detected locally but NEVER reach the wire', async () => {
+    const { detect } = await import('../../../src/manifest/index.js');
+    const detected = await detect(tmpHome);
 
     // Detected — the local report shows them.
-    expect(result.tools.filter((t) => t.type === 'skill').map((t) => t.name)).toContain(
+    expect(detected.tools.filter((t) => t.type === 'skill').map((t) => t.name)).toContain(
       'deep-research',
     );
-    expect(result.tools.filter((t) => t.type === 'subagent').map((t) => t.name)).toContain(
+    expect(detected.tools.filter((t) => t.type === 'subagent').map((t) => t.name)).toContain(
       'code-reviewer',
     );
 
-    // Absent from everything that goes to the server.
-    const payload = syncableTools(result.tools);
-    expect(payload.every((t) => t.type === 'mcp' || t.type === 'plugin')).toBe(true);
-    expect(payload.map((t) => t.name)).not.toContain('deep-research');
-    expect(payload.map((t) => t.name)).not.toContain('code-reviewer');
+    // Absent from the actual request body.
+    const { body } = await captureSyncRequest();
+    expect(body.tools.every((t) => t.type === 'mcp' || t.type === 'plugin')).toBe(true);
+    expect(body.tools.map((t) => t.name)).not.toContain('deep-research');
+    expect(body.tools.map((t) => t.name)).not.toContain('code-reviewer');
+    expect(JSON.stringify(body)).not.toContain('subagent');
   });
 
   it('SECONDARY: the parser internal output (stripped to {type, name}) excludes secret substrings', async () => {
@@ -237,11 +324,12 @@ describe('manifest-only-sync (CLI-05)', () => {
 
   it('detect().tools entries have ONLY the expected keys (type, name, source, scope, client)', async () => {
     // `client` is a fixed literal set by the detector ('claude-code' | 'codex'
-    // | 'cursor'), never a value read out of a config file — so it cannot
-    // carry user data even though it never reaches the server either.
+    // | 'cursor'), never a value read out of a config file. `canonicalPath` is
+    // a local filesystem path used as the dedupe identity. Neither reaches the
+    // server — the wire-payload test above asserts the body is {type, name}.
     const { detect } = await import('../../../src/manifest/index.js');
     const result = await detect(tmpHome);
-    const ALLOWED_KEYS = new Set(['type', 'name', 'source', 'scope', 'client']);
+    const ALLOWED_KEYS = new Set(['type', 'name', 'source', 'scope', 'client', 'canonicalPath']);
     for (const t of result.tools) {
       for (const k of Object.keys(t)) {
         expect(ALLOWED_KEYS.has(k), `unexpected key on ToolEntry: ${k}`).toBe(true);
