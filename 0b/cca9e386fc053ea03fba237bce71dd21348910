@@ -1,0 +1,65 @@
+src/manifest/index.ts
+  s_8ba42ddaefda86::t_47067b5c0adfa8 19,26-39
+  s_201f6c8bbc1c93::t_201fc1e63bf54f 40-41
+test/unit/manifest/dirScan.test.ts
+  s_8ba42ddaefda86::t_8fd37384c044c0 1-153
+src/manifest/dirScan.ts
+  s_8ba42ddaefda86::t_86b92841105fa5 2
+  s_8ba42ddaefda86::t_aab6458b8c4bac 64
+  s_8ba42ddaefda86::t_5d3c3a65ef4bc3 1,3-63,65-151
+test/unit/manifest/security.test.ts
+  s_8ba42ddaefda86::t_6816f17698fabd 175,190-191,193
+  s_8ba42ddaefda86::t_9f4c313e3a9626 120-131
+  s_8ba42ddaefda86::t_cf381e2f8efa7d 205-223
+  s_8ba42ddaefda86::t_50ff47d997f5fc 155-158
+src/ui/report.ts
+  s_8ba42ddaefda86::t_7d691e25aa71fd 30,36,41-42,44
+  s_8ba42ddaefda86::t_2dff224ba2b604 166-197
+  s_8ba42ddaefda86::t_980163f047912b 105
+  s_8ba42ddaefda86::t_8f50160f096b80 2
+src/manifest/claude.ts
+  s_8ba42ddaefda86::t_b5de5fa0c309c5 4
+  s_8ba42ddaefda86::t_81f7c172062647 44,49-54
+  s_8ba42ddaefda86::t_7e13a1263426b3 45-48,55-64,71-72,74,78-79,86-95,97-98,102-129
+  s_8ba42ddaefda86::t_85ac89e4ef7d49 5
+  s_201f6c8bbc1c93::t_8c0a5e4c75533e 130
+src/commands/sync.ts
+  s_8ba42ddaefda86::t_343a1f43ecb2bc 251
+  s_8ba42ddaefda86::t_26a9cf6aeda275 103
+  s_8ba42ddaefda86::t_efa0cc7e336564 122,135
+  s_8ba42ddaefda86::t_4ccadaf9488ea8 1
+  s_8ba42ddaefda86::t_c259cd1cb3bb72 85-86,88-89
+  s_8ba42ddaefda86::t_80e2fa8d677679 201
+src/lib/findUpward.ts
+  s_8ba42ddaefda86::t_b332d6804f672c 33-34,51-72
+  s_8ba42ddaefda86::t_112b874cb95a5e 2
+  s_8ba42ddaefda86::t_ccf4df73dfbd43 35-50
+test/unit/manifest/claude.test.ts
+  s_8ba42ddaefda86::t_8a6fe4c15675ee 53-60
+test/unit/manifest/claude.skills.test.ts
+  s_8ba42ddaefda86::t_2bec640a40d3f9 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0bcca9e386fc053ea03fba237bce71dd21348910",
+  "prompts": {},
+  "sessions": {
+    "s_201f6c8bbc1c93": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fc3ee-0840-7c73-8b75-36ef0e4a8796",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
