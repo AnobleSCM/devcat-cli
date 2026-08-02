@@ -1,0 +1,41 @@
+test/integration/sync.401-refresh.test.ts
+  s_8ba42ddaefda86::t_af63384c400c3b 34-36
+test/integration/sync.json-events.test.ts
+  s_8ba42ddaefda86::t_af63384c400c3b 49-51
+test/integration/sync.paused.test.ts
+  s_8ba42ddaefda86::t_647e9f4e16d3fe 1-59
+test/integration/sync.empty-manifest.test.ts
+  s_8ba42ddaefda86::t_af63384c400c3b 46-48
+src/commands/sync.ts
+  s_8ba42ddaefda86::t_27691d4d53b7a7 50-65
+  s_8ba42ddaefda86::t_5fc890407fba22 80-84
+  s_201f6c8bbc1c93::t_9de1a80d863d40 49
+test/integration/sync.idempotency-replay.test.ts
+  s_8ba42ddaefda86::t_af63384c400c3b 32-34
+test/integration/sync.success.test.ts
+  s_8ba42ddaefda86::t_af63384c400c3b 37-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "d8f68b2d3014532e9c32854a23ec58b4fafa2c44",
+  "prompts": {},
+  "sessions": {
+    "s_201f6c8bbc1c93": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fc3ee-0840-7c73-8b75-36ef0e4a8796",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
