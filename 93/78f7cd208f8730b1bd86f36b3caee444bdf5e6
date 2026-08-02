@@ -1,0 +1,22 @@
+test/unit/manifest/dedupe.test.ts
+  s_8ba42ddaefda86::t_98b477f4d2cd2c 72-97
+src/manifest/dedupe.ts
+  s_8ba42ddaefda86::t_440bb6068b61d3 15-19
+  s_8ba42ddaefda86::t_db73af7846783a 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9378f7cd208f8730b1bd86f36b3caee444bdf5e6",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
