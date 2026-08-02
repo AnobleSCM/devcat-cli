@@ -1,0 +1,23 @@
+src/manifest/cursor.ts
+  s_8ba42ddaefda86::t_a55fd3c77b8c6e 4
+  s_8ba42ddaefda86::t_65196cdc202386 36-37
+src/manifest/codex.ts
+  s_8ba42ddaefda86::t_4e67bfbe4c7a23 5
+  s_8ba42ddaefda86::t_c8db1589d3d263 37-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "08c172d87bd579427057a7f19af81ae735089456",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
