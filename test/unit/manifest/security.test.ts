@@ -117,6 +117,18 @@ describe('manifest-only-sync (CLI-05)', () => {
       },
     }));
 
+    // ─── Skills + subagents (report-only detections) ───────────────
+    mkdirSync(join(tmpHome, '.claude', 'skills', 'deep-research'), { recursive: true });
+    writeFileSync(
+      join(tmpHome, '.claude', 'skills', 'deep-research', 'SKILL.md'),
+      '---\nname: deep-research\n---\nEXA_API_KEY = "exa_test_secret_skill_body"\n',
+    );
+    mkdirSync(join(tmpHome, '.claude', 'agents'), { recursive: true });
+    writeFileSync(
+      join(tmpHome, '.claude', 'agents', 'code-reviewer.md'),
+      'GITHUB_TOKEN: ghp_test_secret_agent_body\n',
+    );
+
     // ─── Activate homedir override so user-scope parsers see tmpHome ─
     // (B2 fix: without this redirect, user-scope manifests would be read
     // from the test runner's real $HOME — not our planted fixtures —
@@ -140,6 +152,10 @@ describe('manifest-only-sync (CLI-05)', () => {
     'sk-test_secret_codex_user',
     // User-scope Cursor (B2 fix: now ACTUALLY tested)
     'sbp_test_secret_cursor_user',
+    // Skill / subagent file bodies are never read at all — only directory
+    // and file names become entries.
+    'exa_test_secret_skill_body',
+    'ghp_test_secret_agent_body',
     // Absolute paths the manifest contained in args / installPath
     '/Users/test/',
     // Env-var KEY=value patterns
@@ -156,7 +172,7 @@ describe('manifest-only-sync (CLI-05)', () => {
     // `source` path field that's only used for --json terminal output and is
     // NEVER sent to the server. The payload going to the server is just
     // {type, name} pairs.
-    const { detect } = await import('../../../src/manifest/index.js');
+    const { detect, syncableTools } = await import('../../../src/manifest/index.js');
     const result = await detect(tmpHome);
 
     // Sanity check — proves all 3 ecosystems' fixtures were loaded
@@ -171,9 +187,10 @@ describe('manifest-only-sync (CLI-05)', () => {
     expect(names).toContain('openai-tools'); // Codex user (B2 — was missing)
     expect(names).toContain('supabase');     // Cursor user (B2 — was missing)
 
-    // Build the exact payload shape that gets POSTed to /api/sync
+    // Build the exact payload shape that gets POSTed to /api/sync. syncableTools()
+    // is what runSync passes to postSync; the compiler rejects the unfiltered list.
     const payload: Pick<SyncRequestBody, 'tools'> = {
-      tools: result.tools.map((t) => ({ type: t.type, name: t.name })),
+      tools: syncableTools(result.tools).map((t) => ({ type: t.type, name: t.name })),
     };
     const payloadJson = JSON.stringify(payload);
 
@@ -183,6 +200,25 @@ describe('manifest-only-sync (CLI-05)', () => {
         `payload contains forbidden substring: ${forbidden}`,
       ).not.toContain(forbidden);
     }
+  });
+
+  it('skills and subagents are detected locally but NEVER enter the sync payload', async () => {
+    const { detect, syncableTools } = await import('../../../src/manifest/index.js');
+    const result = await detect(tmpHome);
+
+    // Detected — the local report shows them.
+    expect(result.tools.filter((t) => t.type === 'skill').map((t) => t.name)).toContain(
+      'deep-research',
+    );
+    expect(result.tools.filter((t) => t.type === 'subagent').map((t) => t.name)).toContain(
+      'code-reviewer',
+    );
+
+    // Absent from everything that goes to the server.
+    const payload = syncableTools(result.tools);
+    expect(payload.every((t) => t.type === 'mcp' || t.type === 'plugin')).toBe(true);
+    expect(payload.map((t) => t.name)).not.toContain('deep-research');
+    expect(payload.map((t) => t.name)).not.toContain('code-reviewer');
   });
 
   it('SECONDARY: the parser internal output (stripped to {type, name}) excludes secret substrings', async () => {

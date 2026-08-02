@@ -16,11 +16,27 @@ export type ToolClient = 'claude-code' | 'codex' | 'cursor';
  * literals above — never a value read out of a config file.
  */
 export interface ToolEntry {
-  type: 'mcp' | 'skill' | 'plugin';
+  type: 'mcp' | 'skill' | 'plugin' | 'subagent';
   name: string;
   source: string;
   scope: 'project' | 'user';
   client: ToolClient;
+}
+
+/**
+ * The subset of detections that may enter the /api/sync payload: MCP servers
+ * and plugins, the two things devcat.dev's catalog matches against.
+ *
+ * Skills and subagents are local report-only detections. They are folders on
+ * this machine with no catalog entry behind them, and 'subagent' is not even
+ * a type the server accepts — so they stay out of the payload entirely.
+ * Narrowing here rather than filtering at the call site means handing an
+ * unfiltered ToolEntry[] to postSync is a compile error, not a runtime bug.
+ */
+export type SyncableToolEntry = ToolEntry & { type: 'mcp' | 'plugin' };
+
+export function syncableTools(tools: readonly ToolEntry[]): SyncableToolEntry[] {
+  return tools.filter((t): t is SyncableToolEntry => t.type === 'mcp' || t.type === 'plugin');
 }
 
 export interface DetectResult {

@@ -1,4 +1,4 @@
-import { detect, type DetectResult } from '../manifest/index.js';
+import { detect, syncableTools, type SyncableToolEntry } from '../manifest/index.js';
 import {
   loadToken,
   saveToken,
@@ -82,9 +82,11 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
     return EXIT_GENERIC_ERROR;
   }
 
-  // 1. Detect manifest
+  // 1. Detect manifest. Skills and subagents are report-only detections, so
+  // only the syncable subset is ever considered here or sent.
   const manifest = await detect(process.cwd());
-  if (manifest.tools.length === 0) {
+  const tools = syncableTools(manifest.tools);
+  if (tools.length === 0) {
     if (isJsonMode()) {
       emitEvent({ type: 'sync.start', tool_count: 0 });
       emitEvent({
@@ -98,7 +100,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
     return EXIT_OK;
   }
   const idempotencyKey = createSyncIdempotencyKey();
-  emitEvent({ type: 'sync.start', tool_count: manifest.tools.length, idempotency_key: idempotencyKey });
+  emitEvent({ type: 'sync.start', tool_count: tools.length, idempotency_key: idempotencyKey });
 
   // 2. Ensure token
   let tokens: TokenPair;
@@ -117,7 +119,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
   try {
     const body = await postSync({
       accessToken: tokens.access_token,
-      tools: manifest.tools,
+      tools,
       idempotencyKey,
       emitStartEvent: false,
     });
@@ -130,7 +132,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
   } catch (err) {
     if (err instanceof TokenInvalidError) {
       // D-16 recovery
-      return await recoverFromTokenInvalid(tokens, manifest, opts, idempotencyKey);
+      return await recoverFromTokenInvalid(tokens, tools, opts, idempotencyKey);
     }
     return handleSyncError(err);
   }
@@ -196,7 +198,7 @@ async function runDeviceFlowInline(opts: SyncOptions): Promise<TokenPair> {
 
 async function recoverFromTokenInvalid(
   tokens: TokenPair,
-  manifest: DetectResult,
+  tools: SyncableToolEntry[],
   opts: SyncOptions,
   idempotencyKey: string,
 ): Promise<ExitCode> {
@@ -246,7 +248,7 @@ async function recoverFromTokenInvalid(
   try {
     const body = await postSync({
       accessToken: nextAccessToken,
-      tools: manifest.tools,
+      tools,
       idempotencyKey,
       emitStartEvent: false,
     });

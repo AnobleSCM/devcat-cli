@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { findUpward } from '../lib/findUpward.js';
+import { findUpward, findUpwardDir, isUserLevelPath } from '../lib/findUpward.js';
+import { scanSkills, scanSubagents } from './dirScan.js';
 import type { ToolEntry } from './index.js';
 
 interface McpServersFile {
@@ -40,30 +41,91 @@ export async function detectClaudeCode(opts: { cwd?: string; scope: 'project' | 
 }
 
 async function detectClaudeProjectScope(cwd: string): Promise<SourceScan> {
-  const path = await findUpward(cwd, '.mcp.json');
-  if (!path) return { tools: [], pathsScanned: [join(cwd, '.mcp.json')] };
-  return readMcpServersJson(path, 'project');
+  const [mcpPath, skillsHit, agentsHit] = await Promise.all([
+    findUpward(cwd, '.mcp.json'),
+    findUpwardDir(cwd, '.claude', 'skills'),
+    findUpwardDir(cwd, '.claude', 'agents'),
+  ]);
+
+  // The user-scope pass reads ~/.claude/skills and ~/.claude/agents directly,
+  // so a walk that climbed all the way to $HOME is dropped here — otherwise
+  // the whole user shelf would be reported as project-scoped.
+  const skillsDir = skillsHit && !isUserLevelPath(skillsHit, '.claude', 'skills') ? skillsHit : null;
+  const agentsDir = agentsHit && !isUserLevelPath(agentsHit, '.claude', 'agents') ? agentsHit : null;
+
+  const [mcp, skills, subagents] = await Promise.all([
+    mcpPath
+      ? readMcpServersJson(mcpPath, 'project')
+      : Promise.resolve({ tools: [], pathsScanned: [join(cwd, '.mcp.json')] }),
+    readSkillsDir(skillsDir ?? join(cwd, '.claude', 'skills'), 'project'),
+    readSubagentsDir(agentsDir ?? join(cwd, '.claude', 'agents'), 'project'),
+  ]);
+
+  return mergeScans([mcp, skills, subagents]);
 }
 
 async function detectClaudeUserScope(): Promise<SourceScan> {
   const claudeJsonPath = join(homedir(), '.claude.json');
   const settingsPath = join(homedir(), '.claude', 'settings.json');
   const pluginsPath = join(homedir(), '.claude', 'plugins', 'installed_plugins.json');
+  const skillsPath = join(homedir(), '.claude', 'skills');
+  const agentsPath = join(homedir(), '.claude', 'agents');
 
-  const [claudeJson, settings, plugins] = await Promise.all([
+  const [claudeJson, settings, plugins, skills, subagents] = await Promise.all([
     readMcpServersJson(claudeJsonPath, 'user'),
     readMcpServersJson(settingsPath, 'user'),
     readInstalledPluginsJson(pluginsPath),
+    readSkillsDir(skillsPath, 'user'),
+    readSubagentsDir(agentsPath, 'user'),
   ]);
 
   // ~/.claude.json wins over ~/.claude/settings.json on name collision (Q4).
   const seen = new Set(claudeJson.tools.map((t) => t.name));
   const settingsFiltered = settings.tools.filter((t) => !seen.has(t.name));
 
+  return mergeScans([
+    { tools: claudeJson.tools, pathsScanned: claudeJson.pathsScanned },
+    { tools: settingsFiltered, pathsScanned: settings.pathsScanned },
+    plugins,
+    skills,
+    subagents,
+  ]);
+}
+
+function mergeScans(scans: SourceScan[]): SourceScan {
   return {
-    tools: [...claudeJson.tools, ...settingsFiltered, ...plugins.tools],
-    pathsScanned: [...claudeJson.pathsScanned, ...settings.pathsScanned, ...plugins.pathsScanned],
+    tools: scans.flatMap((s) => s.tools),
+    pathsScanned: scans.flatMap((s) => s.pathsScanned),
   };
+}
+
+/**
+ * Installed skills under a `skills/` root. These are report-only detections —
+ * they never enter the /api/sync payload (see syncableTools in index.ts).
+ */
+async function readSkillsDir(path: string, scope: 'project' | 'user'): Promise<SourceScan> {
+  const hits = await scanSkills(path);
+  const tools: ToolEntry[] = hits.map((hit) => ({
+    type: 'skill' as const,
+    name: hit.name,
+    source: path,
+    scope,
+    client: 'claude-code' as const,
+  }));
+  return { tools, pathsScanned: [path] };
+}
+
+/** Subagent personas under an `agents/` root. Report-only, as above. */
+async function readSubagentsDir(path: string, scope: 'project' | 'user'): Promise<SourceScan> {
+  const hits = await scanSubagents(path);
+  const tools: ToolEntry[] = hits.map((hit) => ({
+    type: 'subagent' as const,
+    name: hit.name,
+    source: path,
+    scope,
+    client: 'claude-code' as const,
+  }));
+  return { tools, pathsScanned: [path] };
 }
 
 async function readMcpServersJson(path: string, scope: 'project' | 'user'): Promise<SourceScan> {

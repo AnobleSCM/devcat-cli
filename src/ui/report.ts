@@ -1,4 +1,5 @@
 import type { DetectResult, ToolEntry, ToolClient } from '../manifest/index.js';
+import { CLI_VERSION } from '../version.js';
 import { c, SUCCESS_GLYPH } from './colors.js';
 
 /**
@@ -26,18 +27,21 @@ const CLIENT_LABEL: Record<ToolClient, string> = {
 
 type ToolType = ToolEntry['type'];
 
-const TYPE_ORDER: readonly ToolType[] = ['mcp', 'plugin', 'skill'];
+const TYPE_ORDER: readonly ToolType[] = ['mcp', 'plugin', 'skill', 'subagent'];
 
 const TYPE_LABEL_MARKDOWN: Record<ToolType, string> = {
   mcp: 'MCP servers',
   plugin: 'Plugins',
   skill: 'Skills',
+  subagent: 'Subagents',
 };
 
 /** Total line width the terminal report wraps to. */
 const WRAP_WIDTH = 78;
+/** Width of the type label column — one wider than the longest type name. */
+const TYPE_WIDTH = 9;
 /** Column where the comma-separated names start (and continuation lines indent to). */
-const NAME_COLUMN = 14;
+const NAME_COLUMN = 15;
 
 export interface StackTypeGroup {
   type: ToolType;
@@ -98,7 +102,7 @@ export function renderStackReport(result: DetectResult): string {
     lines.push('');
     lines.push(`${c.bold(group.label)} ${c.dim(`· ${plural(group.total, 'tool')}`)}`);
     for (const { type, names } of group.byType) {
-      const prefix = `  ${String(names.length).padStart(3)} ${type.padEnd(8)}`;
+      const prefix = `  ${String(names.length).padStart(3)} ${type.padEnd(TYPE_WIDTH)}`;
       const wrapped = wrap(names.join(', '), WRAP_WIDTH - NAME_COLUMN);
       lines.push(`${prefix}${wrapped[0]}`);
       for (const cont of wrapped.slice(1)) {
@@ -157,6 +161,38 @@ export function renderStackMarkdown(result: DetectResult): string {
   lines.push('');
   lines.push(MARKDOWN_FOOTER);
   return lines.join('\n');
+}
+
+/**
+ * Machine-readable mirror of the terminal report, for `devcat --json`.
+ *
+ * One JSON object rather than the NDJSON event stream sync emits — this is a
+ * result, not a sequence of events. Same grouping, same ordering, same counts
+ * as the human report, so a script and a reader see the same scan.
+ */
+export function renderStackJson(result: DetectResult): string {
+  const groups = groupStack(result.tools);
+  const total = result.tools.length;
+  const projectScoped = result.tools.filter((t) => t.scope === 'project').length;
+
+  const payload = {
+    cli_version: CLI_VERSION,
+    total,
+    project_scoped: projectScoped,
+    user_scoped: total - projectScoped,
+    clients: groups.map((group) => ({
+      client: group.client,
+      label: group.label,
+      total: group.total,
+      types: group.byType.map(({ type, names }) => ({
+        type,
+        count: names.length,
+        names,
+      })),
+    })),
+    paths_checked: result.pathsScanned,
+  };
+  return JSON.stringify(payload, null, 2);
 }
 
 const MARKDOWN_FOOTER =
