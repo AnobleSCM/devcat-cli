@@ -16,8 +16,9 @@ import { join } from 'node:path';
  *     path is what deduplicates aliases pointing at the same skill.
  *   - A broken symlink, an unreadable directory, or a vanished entry is
  *     skipped. A machine with a stale link never fails a scan.
- *   - Entry count per root is capped so a pathological directory cannot make
- *     the CLI hang.
+ *   - Entry count per root is capped, and the cap is applied after sorting so
+ *     the kept subset is the same on every run regardless of the order the
+ *     filesystem happened to return.
  *
  * Names come from the directory (or file) name, which is how skills and
  * subagents are actually addressed — no file contents are read.
@@ -50,10 +51,13 @@ export async function scanSkills(root: string): Promise<DirHit[]> {
 /**
  * Subagents: both shapes Claude Code accepts —
  *   <root>/<name>.md          (a bare persona file)
- *   <root>/<name>/<name>.md   (a persona folder)
+ *   <root>/<name>/<name>.md   (a persona folder, matching name required)
  *
- * Depth 2 at the most, and the second level is read only far enough to
- * confirm the folder holds at least one .md.
+ * The folder shape is matched exactly: `reviewer/` counts only if it holds
+ * `reviewer.md`. A folder holding some other markdown — a README, notes — is
+ * not a persona and is skipped. That exactness also means the second level
+ * costs one stat for a known filename rather than a directory listing, so
+ * nothing here reads an unbounded number of entries.
  */
 export async function scanSubagents(root: string): Promise<DirHit[]> {
   return scanRoot(root, async (entryPath, name) => {
@@ -65,7 +69,7 @@ export async function scanSubagents(root: string): Promise<DirHit[]> {
     }
     const resolved = await resolveDir(entryPath);
     if (!resolved) return null;
-    if (!(await containsMarkdown(resolved))) return null;
+    if (!(await isFile(join(resolved, `${name}.md`)))) return null;
     return { name, realPath: resolved };
   });
 }
@@ -80,6 +84,11 @@ async function scanRoot(
 ): Promise<DirHit[]> {
   let names: string[];
   try {
+    // readdir materializes the whole listing. Node's streaming alternative
+    // (opendir) would avoid that, but a deterministic cap has to know every
+    // candidate name before choosing which to keep — so the names are read in
+    // full (strings only, cheap), then sorted, and only then is the cap
+    // applied to the expensive per-entry stat/realpath work below.
     names = await readdir(root);
   } catch {
     // Missing root, or no permission to read it. Either way: nothing here.
@@ -88,8 +97,8 @@ async function scanRoot(
 
   const candidates = names
     .filter((name) => !name.startsWith('.'))
-    .slice(0, MAX_ENTRIES_PER_ROOT)
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, MAX_ENTRIES_PER_ROOT);
 
   const settled = await Promise.all(
     candidates.map(async (name) => {
@@ -136,15 +145,6 @@ async function realpathOrNull(path: string): Promise<string | null> {
 async function isFile(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
-}
-
-async function containsMarkdown(dir: string): Promise<boolean> {
-  try {
-    const names = await readdir(dir);
-    return names.some((n) => !n.startsWith('.') && n.toLowerCase().endsWith('.md'));
   } catch {
     return false;
   }

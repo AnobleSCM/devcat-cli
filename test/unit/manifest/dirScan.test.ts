@@ -109,6 +109,25 @@ describe('scanSkills', () => {
     writeFileSync(file, 'not a directory');
     await expect(scanSkills(file)).resolves.toEqual([]);
   });
+
+  it('caps a large root deterministically — sorted first, so the kept subset is stable', async () => {
+    const root = join(tmp, 'skills');
+    mkdirSync(root);
+    // 520 skills, over the 500 cap. Names are zero-padded so alphabetical
+    // order is also numeric order and the expected survivors are obvious.
+    for (let i = 0; i < 520; i++) makeSkill(root, `skill-${String(i).padStart(4, '0')}`);
+
+    const first = await scanSkills(root);
+    const second = await scanSkills(root);
+
+    expect(first).toHaveLength(500);
+    // Same subset every run, and it is the alphabetical head — not whatever
+    // order the filesystem happened to hand back.
+    expect(first.map((h) => h.name)).toEqual(second.map((h) => h.name));
+    expect(first[0]!.name).toBe('skill-0000');
+    expect(first[499]!.name).toBe('skill-0499');
+    expect(first.map((h) => h.name)).not.toContain('skill-0500');
+  });
 });
 
 describe('scanSubagents', () => {
@@ -128,6 +147,28 @@ describe('scanSubagents', () => {
 
     const hits = await scanSubagents(root);
     expect(hits.map((h) => h.name)).toEqual(['code-reviewer']);
+  });
+
+  it('requires the folder name to match: reviewer/README.md is NOT subagent "reviewer"', async () => {
+    const root = join(tmp, 'agents');
+    mkdirSync(join(root, 'reviewer'), { recursive: true });
+    writeFileSync(join(root, 'reviewer', 'README.md'), '# just docs');
+    writeFileSync(join(root, 'reviewer', 'notes.md'), 'x');
+
+    const hits = await scanSubagents(root);
+    expect(hits).toEqual([]);
+  });
+
+  it('matches the folder shape only on an exact name match', async () => {
+    const root = join(tmp, 'agents');
+    mkdirSync(join(root, 'debugger'), { recursive: true });
+    writeFileSync(join(root, 'debugger', 'debugger.md'), 'x');
+    writeFileSync(join(root, 'debugger', 'README.md'), 'x');
+    mkdirSync(join(root, 'impostor'), { recursive: true });
+    writeFileSync(join(root, 'impostor', 'something-else.md'), 'x');
+
+    const hits = await scanSubagents(root);
+    expect(hits.map((h) => h.name)).toEqual(['debugger']);
   });
 
   it('handles both shapes in one directory, ignoring folders with no markdown', async () => {
