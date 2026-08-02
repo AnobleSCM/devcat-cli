@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import { findUpward } from '../lib/findUpward.js';
+import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
 import type { ToolEntry } from './index.js';
 
 interface CodexConfigToml {
@@ -34,6 +34,9 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.codex', 'config.toml');
+    // $HOME is an ancestor of most working directories; the user pass above
+    // already reads that exact file, so don't relabel it project-scoped.
+    if (path && isUserLevelPath(path, '.codex', 'config.toml')) path = null;
     scannedPath = path ?? join(opts.cwd, '.codex', 'config.toml');
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }

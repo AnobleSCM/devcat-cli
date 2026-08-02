@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { findUpward } from '../lib/findUpward.js';
+import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
 import type { ToolEntry } from './index.js';
 
 interface CursorMcpFile {
@@ -33,6 +33,8 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.cursor', 'mcp.json');
+    // Same $HOME-is-an-ancestor guard as the Codex detector.
+    if (path && isUserLevelPath(path, '.cursor', 'mcp.json')) path = null;
     scannedPath = path ?? join(opts.cwd, '.cursor', 'mcp.json');
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }
