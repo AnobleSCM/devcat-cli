@@ -69,6 +69,32 @@ describe('dedupe — canonical path identity', () => {
     expect(dedupe([a, b])).toHaveLength(1);
   });
 
+  it('keeps one directory that is BOTH a skill and a subagent', () => {
+    // A folder holding a SKILL.md and a matching <name>.md, linked into both
+    // the skills root and the agents root, is legitimately two tools. Keying
+    // on path alone silently dropped whichever was scanned second.
+    const shared = '/canon/tldraw-offline';
+    const asSkill: ToolEntry = {
+      type: 'skill', name: 'tldraw-offline', source: '/claude/skills',
+      scope: 'user', client: 'claude-code', canonicalPath: shared,
+    };
+    const asSubagent: ToolEntry = {
+      type: 'subagent', name: 'tldraw-offline', source: '/claude/agents',
+      scope: 'user', client: 'claude-code', canonicalPath: shared,
+    };
+
+    const result = dedupe([asSkill, asSubagent]);
+    expect(result).toHaveLength(2);
+    expect(result.map((t) => t.type)).toEqual(['skill', 'subagent']);
+  });
+
+  it('still collapses same-path entries of the SAME type', () => {
+    const shared = '/canon/panel';
+    const viaClaude = skill('panel', shared, 'claude-code');
+    const viaCodex = skill('panel-alias', shared, 'codex');
+    expect(dedupe([viaClaude, viaCodex])).toHaveLength(1);
+  });
+
   it('never lets a path key collide with a name key', () => {
     const pathEntry = skill('x', 'skill::x', 'claude-code');
     const nameEntry: ToolEntry = { type: 'skill', name: 'x', source: 's', scope: 'user', client: 'codex' };

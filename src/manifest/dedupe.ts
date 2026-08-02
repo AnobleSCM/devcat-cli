@@ -12,6 +12,11 @@ import type { ToolEntry } from './index.js';
  *     farms into one shared directory, so path identity is what actually
  *     collapses that overlap — and it is what stops two genuinely different
  *     skills that happen to share a name from swallowing each other.
+ *
+ *     Type is part of that key. One directory can legitimately be two tools:
+ *     a folder holding both a SKILL.md and a matching <name>.md, linked into
+ *     the skills root and the agents root, is a skill AND a subagent. Keying
+ *     on path alone would silently drop whichever was scanned second.
  *   - An entry without one is a key inside a config file, where (type, name)
  *     is the only identity available. That is also what the server matches on.
  *
@@ -28,7 +33,7 @@ export function dedupe(entries: ToolEntry[]): ToolEntry[] {
   const out: ToolEntry[] = [];
   for (const e of entries) {
     const key = e.canonicalPath
-      ? `path::${e.canonicalPath}`
+      ? `path::${e.type}::${e.canonicalPath}`
       : `name::${e.type}::${e.name}`;
     if (seen.has(key)) continue;
     seen.add(key);
