@@ -109,14 +109,19 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 Config files and directory names only — never file contents:
 
 - **Claude Code** — `~/.claude.json`, `~/.claude/settings.json`, `~/.claude/plugins/installed_plugins.json`, `~/.claude/skills/`, `~/.claude/agents/`, and their project equivalents (`.mcp.json`, `.claude/skills/`, `.claude/agents/`)
-- **Codex CLI** — `.codex/config.toml` (project), `~/.codex/config.toml`
+- **Codex CLI** — `.codex/config.toml` (project), `~/.codex/config.toml`, `~/.codex/skills/`
 - **Cursor** — `.cursor/mcp.json` (project), `~/.cursor/mcp.json`
 
 Skills and subagents are folders, so they are found by listing a directory rather than parsing a file. That scan is deliberately shallow: it reads the config root and its immediate children, never recurses, resolves symlinks to dedupe the link-farm layouts these directories usually use, and skips broken links, unreadable folders, and anything without a `SKILL.md`. Skill and subagent **names come from the folder name** — no file is opened.
 
 It never reads or reports environment variable values, command-line arguments, file paths, file contents, or any field other than the tool name and type. Missing and malformed config files are skipped silently — a broken `.mcp.json` never fails the scan.
 
-Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root, so your user-wide config is never double-counted as project config. A tool configured in more than one place is listed once, under the first place it was found (project configs before user configs).
+Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root, so your user-wide config is never double-counted as project config.
+
+**A tool configured in more than one place is listed once.** Two passes decide where it lands, and both are deterministic — the same machine always produces the same report:
+
+- Within one directory, aliases are collapsed by resolved symlink target. Two links to the same skill are one skill.
+- Across clients, the first occurrence wins, in a fixed scan order: project before user, and Claude Code before Codex before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory, so a skill on both shelves is listed once under Claude Code. A skill only Codex has still appears under Codex.
 
 Install it globally if you run it often:
 
@@ -160,7 +165,7 @@ Sync sends MCP servers and plugins only. Skills and subagents are local report d
 
 **The report is empty.** It lists every path it checked — if your config lives somewhere else, that's the gap. Open an [issue](https://github.com/AnobleSCM/devcat-cli/issues) with the location and it can be added.
 
-**A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Cursor), Claude Code plugins, skills, and subagents. Codex's own `~/.codex/skills` directory is not scanned yet.
+**A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Cursor), Claude Code plugins and subagents, and skills from both the Claude Code and Codex shelves. Skills bundled inside an installed plugin are not counted separately — the plugin itself is listed.
 
 **`OS keychain unavailable` on Linux.** Only affects `sync`. Install libsecret: `sudo apt install libsecret-1-0` (Debian/Ubuntu), `sudo pacman -S libsecret` (Arch), or `sudo dnf install libsecret` (Fedora).
 
