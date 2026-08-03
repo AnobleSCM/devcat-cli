@@ -1,0 +1,62 @@
+README.md
+  s_b0cc069485b4f5::t_467627d9ce9c48 104
+  s_b0cc069485b4f5::t_d1cdd0960fd3d2 23-24,28-32,35,38,42-43
+CHANGELOG.md
+  s_b0cc069485b4f5::t_c30cdb94eb12f3 5-24
+src/ui/report.ts
+  s_b0cc069485b4f5::t_491097a9e3c772 266-267
+  s_b0cc069485b4f5::t_bd574f63213adb 216
+  s_b0cc069485b4f5::t_db1b42d207c9fb 165-186,189-196,198,200-215,217-220
+  s_b0cc069485b4f5::t_3b3178f6c44b77 187-188,197,199
+  s_b0cc069485b4f5::t_1f55d0e9d2acbc 470-472,476,478,481-482
+  s_b0cc069485b4f5::t_d2d6097040994b 246-257,261-262,271-272,281-282,285-288,293-300
+  s_b0cc069485b4f5::t_fb95626d96e9d5 245,333-335,339-346
+  s_b0cc069485b4f5::t_27e7e6f928224d 81-82
+  s_b0cc069485b4f5::t_45c77c8f416bbf 42-58,63-80,83-98
+  s_b0cc069485b4f5::t_4905e068b7d1bd 347
+test/unit/ui/report.test.ts
+  s_b0cc069485b4f5::t_d35d3dfb05701c 331-418
+  s_b0cc069485b4f5::t_a0d341b6049afd 258-279
+  s_b0cc069485b4f5::t_9d899baffc3bea 10,12
+  s_b0cc069485b4f5::t_0a65832351b66e 149-150
+  s_b0cc069485b4f5::t_68e154742b1568 82-96
+  s_b0cc069485b4f5::t_045ab3a0f84785 117-125
+  s_b0cc069485b4f5::t_6e891def010979 176-237
+src/ui/colors.ts
+  s_b0cc069485b4f5::t_d542e4b61d7763 12-20,28-29
+test/unit/ui/report.tty-color.test.ts
+  s_b0cc069485b4f5::t_eba5e6ce4613da 11-16,36,38-45,50-71,88-91,97,101,103-105,107-129,131-132,135,137,140-146,149-151,153-170,172-200
+test/unit/api/client.test.ts
+  s_b0cc069485b4f5::t_249c91811937f4 5
+  s_b0cc069485b4f5::t_37dcbcbe59f7d1 24-28
+test/unit/ui/colors.test.ts
+  s_b0cc069485b4f5::t_59eebd947a2248 38-40,50-52
+  s_b0cc069485b4f5::t_05e55132f77721 61-62,70-71
+src/version.ts
+  s_b0cc069485b4f5::t_6bd9615052c6ec 7
+test/unit/auth/deviceFlow.test.ts
+  s_b0cc069485b4f5::t_ba977217eb7bd3 267-270
+  s_b0cc069485b4f5::t_d0ed80c73c6346 12
+assets/devcat-report.svg
+  s_b0cc069485b4f5::t_6a2e878496ed0c 1-4,8,10-24
+package-lock.json
+  s_b0cc069485b4f5::t_89181a2717d9b0 3,9
+package.json
+  s_b0cc069485b4f5::t_9ecfa9d08b94b6 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0b7802792435f30109532e859f6c9b861e86e4b0",
+  "prompts": {},
+  "sessions": {
+    "s_b0cc069485b4f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87f4dd2-a0ee-4340-a6b7-18d3cb841bc2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
