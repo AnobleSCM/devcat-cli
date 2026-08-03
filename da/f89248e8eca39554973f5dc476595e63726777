@@ -1,0 +1,19 @@
+docs/agents/issue-tracker.md
+  s_0b350f3df1cca9::t_bfee889ae958dd 1-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "daf89248e8eca39554973f5dc476595e63726777",
+  "prompts": {},
+  "sessions": {
+    "s_0b350f3df1cca9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "447a88ef-9399-4412-b757-2142d02f24df",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
