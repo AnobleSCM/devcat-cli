@@ -35,7 +35,9 @@ export function detectEnv(): EnvFlags {
       !!process.env.BUILDKITE ||
       !!process.env.CIRCLECI ||
       !!process.env.JENKINS_URL,
-    noColor: !!process.env.NO_COLOR,
+    // Presence, not truthiness: no-color.org disables color "when [NO_COLOR
+    // is] present (regardless of its value)", so NO_COLOR='' must count too.
+    noColor: process.env.NO_COLOR !== undefined,
   };
 }
 

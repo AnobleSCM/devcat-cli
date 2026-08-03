@@ -1,16 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { sep, join } from 'node:path';
 import {
   groupStack,
   renderStackReport,
   renderStackMarkdown,
   renderStackJson,
   truncationWarnings,
+  toHomeRelative,
 } from '../../../src/ui/report.js';
 import type { DetectResult, ToolEntry } from '../../../src/manifest/index.js';
 
 // Vitest fork pools leave process.stdout.isTTY undefined so colors auto-strip;
 // NO_COLOR is belt-and-suspenders for any CI shape where isTTY is truthy.
 process.env.NO_COLOR = '1';
+
+// Only the home-relative-path tests below care what homedir() returns; every
+// other test in this file uses fixture paths that never match a real home
+// dir, so this mock is a no-op for them (same pattern as the integration
+// suite's homedirHolder).
+const homedirHolder: { current: string | null } = { current: null };
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => homedirHolder.current ?? actual.homedir() };
+});
 
 function tool(partial: Partial<ToolEntry> & Pick<ToolEntry, 'name'>): ToolEntry {
   return {
@@ -127,10 +140,118 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
 
   it('empty scan: names the paths it checked instead of printing an empty stack', () => {
     const out = renderStackReport({ tools: [], pathsScanned: ['/p/.mcp.json', '~/.cursor/mcp.json'], truncations: [] });
-    expect(out).toContain('No AI tooling detected.');
+    expect(out).toContain('No AI tooling detected on this machine yet.');
     expect(out).toContain('/p/.mcp.json');
     expect(out).toContain('~/.cursor/mcp.json');
     expect(out).not.toContain('Your AI-coding stack');
+  });
+});
+
+describe('renderEmptyStack — copy and home-relative paths (terminal report only)', () => {
+  // Built from node:path primitives rather than hardcoded POSIX literals:
+  // toHomeRelative keys off path.sep, and a hardcoded '/' fixture silently
+  // no-ops the whole boundary check on win32 (sep is '\\' there), which is
+  // exactly how this suite went green on Unix while failing on Windows CI.
+  const HOME = join(sep, 'Users', 'testuser');
+
+  beforeEach(() => {
+    homedirHolder.current = HOME;
+  });
+
+  afterEach(() => {
+    homedirHolder.current = null;
+  });
+
+  it('uses warm, honest, marketing-free copy', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [join(HOME, '.claude.json')], truncations: [] });
+    expect(out).toContain('No AI tooling detected on this machine yet.');
+  });
+
+  it('keeps the Looked in: transparency section', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [join(HOME, '.claude.json')], truncations: [] });
+    expect(out).toContain('Looked in:');
+  });
+
+  it('shows paths under $HOME as home-relative', () => {
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: [join(HOME, '.claude.json'), join(HOME, '.claude', 'skills')],
+      truncations: [],
+    });
+    expect(out).toContain(`~${sep}.claude.json`);
+    expect(out).toContain(`~${sep}.claude${sep}skills`);
+    expect(out).not.toContain(HOME);
+  });
+
+  it('leaves paths outside $HOME absolute', () => {
+    const outside = join(sep, 'opt', 'shared', '.mcp.json');
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: [outside],
+      truncations: [],
+    });
+    expect(out).toContain(outside);
+  });
+
+  it('does not rewrite a sibling directory that merely shares the home prefix', () => {
+    // HOME + '2' (e.g. /Users/testuser2) must not become ~2 from a naive
+    // (non-boundary) prefix match.
+    const sibling = `${HOME}2${sep}.mcp.json`;
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: [sibling],
+      truncations: [],
+    });
+    expect(out).toContain(sibling);
+  });
+
+  it('renders the home directory itself as bare ~', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [HOME], truncations: [] });
+    expect(out).toContain('  - ~');
+  });
+
+  it('does not home-relativize paths_checked in --json output', () => {
+    const parsed = JSON.parse(
+      renderStackJson({ tools: [], pathsScanned: [join(HOME, '.claude.json')], truncations: [] }),
+    );
+    expect(parsed.paths_checked).toEqual([join(HOME, '.claude.json')]);
+  });
+});
+
+describe('toHomeRelative — case-sensitivity policy', () => {
+  // caseSensitivity is an explicit parameter precisely so these can run
+  // deterministically on every CI lane instead of only asserting whatever
+  // the host platform's own case-folding happens to do.
+  const HOME = join(sep, 'Users', 'testuser');
+
+  it('matches a differently-cased home prefix in insensitive mode (win32/darwin policy)', () => {
+    const shouted = `${HOME.toUpperCase()}${sep}.claude.json`;
+    expect(toHomeRelative(shouted, HOME, 'insensitive')).toBe(`~${sep}.claude.json`);
+  });
+
+  it('does not match a differently-cased home prefix in sensitive mode (linux policy)', () => {
+    const shouted = `${HOME.toUpperCase()}${sep}.claude.json`;
+    expect(toHomeRelative(shouted, HOME, 'sensitive')).toBe(shouted);
+  });
+
+  it('preserves the original path casing beyond the matched prefix', () => {
+    // The comparison folds case; the output must not — only the matched
+    // home-prefix span is replaced by ~, the remainder prints as scanned.
+    const shouted = `${HOME.toUpperCase()}${sep}MixedCase.JSON`;
+    expect(toHomeRelative(shouted, HOME, 'insensitive')).toBe(`~${sep}MixedCase.JSON`);
+  });
+
+  it('holds the sibling-directory boundary guard case-insensitively', () => {
+    // home '/users/name' + path '/Users/NAME2/x' must stay absolute even
+    // when folding case — NAME2 is a sibling, not home itself.
+    const home = join(sep, 'users', 'name');
+    const sibling = `${join(sep, 'Users', 'NAME')}2${sep}x`;
+    expect(toHomeRelative(sibling, home, 'insensitive')).toBe(sibling);
+  });
+
+  it('exact-equality shortcut also folds case in insensitive mode', () => {
+    expect(toHomeRelative(HOME.toUpperCase(), HOME, 'insensitive')).toBe('~');
+    expect(toHomeRelative(HOME.toUpperCase(), HOME, 'sensitive')).toBe(HOME.toUpperCase());
   });
 });
 
@@ -291,7 +412,7 @@ describe('truncation disclosure', () => {
       pathsScanned: ['~/.claude/skills'],
       truncations: TRUNCATED.truncations,
     });
-    expect(out).toContain('No AI tooling detected.');
+    expect(out).toContain('No AI tooling detected on this machine yet.');
     expect(out).toContain('1 location was truncated');
     expect(out).toContain('some tools are not listed');
   });

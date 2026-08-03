@@ -33,7 +33,17 @@ describe('detectEnv', () => {
   it('reads NO_COLOR env var into noColor flag', () => {
     vi.stubEnv('NO_COLOR', '1');
     expect(detectEnv().noColor).toBe(true);
+  });
+
+  it('treats an empty-string NO_COLOR as present, per the no-color.org spec', () => {
+    // no-color.org: disable color "when [NO_COLOR is] present (regardless of
+    // its value)" — presence, not truthiness, is what must gate this.
     vi.stubEnv('NO_COLOR', '');
+    expect(detectEnv().noColor).toBe(true);
+  });
+
+  it('is false when NO_COLOR is not present at all', () => {
+    vi.stubEnv('NO_COLOR', undefined);
     expect(detectEnv().noColor).toBe(false);
   });
 

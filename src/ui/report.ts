@@ -1,3 +1,5 @@
+import { homedir } from 'node:os';
+import { sep } from 'node:path';
 import type { DetectResult, ToolEntry, ToolClient, RootTruncation } from '../manifest/index.js';
 import { READ_CEILING } from '../manifest/index.js';
 import { CLI_VERSION } from '../version.js';
@@ -75,6 +77,46 @@ function sanitizeMarkdownName(name: string): string {
   return sanitizeName(name).replace(/`/g, '');
 }
 
+/** Whether the home-prefix comparison in {@link toHomeRelative} folds case. */
+export type PathCaseSensitivity = 'sensitive' | 'insensitive';
+
+/**
+ * win32 and macOS both default to case-insensitive (but case-preserving)
+ * filesystems, so a homedir() or $HOME that is cased differently from a
+ * scanned path can still name the same directory. Linux filesystems are
+ * case-sensitive, so a cased difference there is a genuinely different path.
+ */
+function defaultPathCaseSensitivity(platform: NodeJS.Platform = process.platform): PathCaseSensitivity {
+  return platform === 'win32' || platform === 'darwin' ? 'insensitive' : 'sensitive';
+}
+
+/**
+ * Display-only: rewrite a path under `home` to start with `~`. Requires a
+ * separator (or exact equality) at the boundary so a sibling directory that
+ * merely shares the prefix — /Users/name2 next to /Users/name — is left
+ * absolute rather than mangled into ~2.
+ *
+ * The prefix comparison is case-insensitive on win32/darwin and
+ * case-sensitive elsewhere (see {@link defaultPathCaseSensitivity}) — this
+ * is a policy about matching, not about display: casing is folded only to
+ * decide whether `path` sits under `home`, never to build the return value.
+ * The output always keeps `path`'s original casing; the matched prefix span
+ * is simply discarded in favor of `~`, not re-cased. `caseSensitivity`
+ * defaults to the real platform policy but is an explicit parameter so tests
+ * can exercise both modes deterministically regardless of which OS actually
+ * runs them.
+ */
+export function toHomeRelative(
+  path: string,
+  home: string,
+  caseSensitivity: PathCaseSensitivity = defaultPathCaseSensitivity(),
+): string {
+  const fold = caseSensitivity === 'insensitive' ? (s: string) => s.toLowerCase() : (s: string) => s;
+  if (fold(path) === fold(home)) return '~';
+  const prefix = home.endsWith(sep) ? home : `${home}${sep}`;
+  return fold(path).startsWith(fold(prefix)) ? `~${sep}${path.slice(prefix.length)}` : path;
+}
+
 /**
  * Group detected tools by client, then by type, with names sorted
  * alphabetically. Clients and types with nothing in them are omitted.
@@ -122,7 +164,9 @@ export function renderStackReport(result: DetectResult): string {
     lines.push('');
     lines.push(`${c.bold(group.label)} ${c.dim(`· ${plural(group.total, 'tool')}`)}`);
     for (const { type, names } of group.byType) {
-      const prefix = `  ${String(names.length).padStart(3)} ${type.padEnd(TYPE_WIDTH)}`;
+      const count = c.bold(String(names.length).padStart(3));
+      const label = c.cyan(type.padEnd(TYPE_WIDTH));
+      const prefix = `  ${count} ${label}`;
       const wrapped = wrap(names.map(sanitizeName).join(', '), WRAP_WIDTH - NAME_COLUMN);
       lines.push(`${prefix}${wrapped[0]}`);
       for (const cont of wrapped.slice(1)) {
@@ -280,12 +324,17 @@ const MARKDOWN_FOOTER =
 
 /**
  * Nothing found. Print the paths that were checked so the user can spot the
- * config location the CLI does not know about yet.
+ * config location the CLI does not know about yet. Paths under $HOME print
+ * home-relative (~/.claude/skills) — display only; --json's paths_checked
+ * stays absolute for scripts.
  */
 function renderEmptyStack(result: DetectResult): string {
-  const list = result.pathsScanned.map((p) => `  - ${sanitizeName(p)}`).join('\n');
+  const home = homedir();
+  const list = result.pathsScanned
+    .map((p) => `  - ${toHomeRelative(sanitizeName(p), home)}`)
+    .join('\n');
   const lines = [
-    `${SUCCESS_GLYPH} ${c.bold('No AI tooling detected.')}`,
+    `${SUCCESS_GLYPH} ${c.bold('No AI tooling detected on this machine yet.')}`,
     '',
     'Looked in:',
     list,
