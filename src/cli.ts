@@ -55,7 +55,7 @@ export function buildProgram(sink: ExitCodeSink): Command {
 
   program
     .command('sync')
-    .description('Push your AI tool manifest to devcat.dev (paused while the site is rebuilt)')
+    .description('Push your AI tool manifest to devcat.dev (hosted sync retired)')
     .option('--no-open', 'do not auto-open the browser at the verification URL')
     .option('--json', 'emit machine-readable JSON event stream (for CI)')
     .option('-v, --verbose', 'emit redacted HTTP trace to stderr')

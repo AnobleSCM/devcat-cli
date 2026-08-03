@@ -14,6 +14,8 @@ byte-for-byte unchanged apart from the `cli_version` field.
   and `Looked in:` paths now print home-relative (`~/.claude/skills`)
 - Fixed `NO_COLOR=''` (empty value) not being treated as "set" — the
   no-color.org standard disables color on presence, not truthiness
+- Sync messaging: CLI description, error output, and README now say the
+  hosted service is retired, not paused/rebuilt
 
 ## [0.2.0]
 

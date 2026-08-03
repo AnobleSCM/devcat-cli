@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
- * devcat.dev is being rebuilt, so `devcat sync` stops on one line instead of
- * starting a device flow that cannot finish. This suite deliberately does NOT
- * set DEVCAT_SYNC_ENABLED — it covers the paused path the other sync
- * integration suites opt out of.
+ * devcat.dev's hosted sync is retired, so `devcat sync` stops on one line
+ * instead of starting a device flow that cannot finish. This suite
+ * deliberately does NOT set DEVCAT_SYNC_ENABLED — it covers the retired
+ * path the other sync integration suites opt out of.
  */
 process.env.NO_COLOR = '1';
 
@@ -19,7 +19,7 @@ afterEach(() => {
   else process.env.DEVCAT_SYNC_ENABLED = originalFlag;
 });
 
-describe('sync — paused while devcat.dev is down', () => {
+describe('sync — retired (devcat.dev no longer hosts profiles)', () => {
   it('prints exactly one line, opens no browser, makes no request, exits 1', async () => {
     const stderr: string[] = [];
     const stdout: string[] = [];
@@ -50,7 +50,7 @@ describe('sync — paused while devcat.dev is down', () => {
 
     const err = stderr.join('');
     expect(err.trimEnd().split('\n')).toHaveLength(1);
-    expect(err).toContain('Profile sync is paused while devcat.dev is rebuilt.');
+    expect(err).toContain('Profile sync is retired — devcat.dev no longer hosts profiles.');
     expect(err).toContain('npx devcat-cli');
     // No stack trace, no retry noise.
     expect(err).not.toContain('at ');

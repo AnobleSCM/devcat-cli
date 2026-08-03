@@ -47,17 +47,18 @@ export interface SyncOptions {
 }
 
 /**
- * devcat.dev is being rebuilt, so the hosted sync endpoint is not answering.
- * Sync stops on the one line below instead of running the device flow and
- * failing deep inside an HTTP call — no browser, no polling, no retries.
+ * The hosted devcat.dev sync endpoint is retired — devcat.dev no longer
+ * accepts profile syncs. Sync stops on the one line below instead of
+ * running the device flow and failing deep inside an HTTP call — no
+ * browser, no polling, no retries.
  *
  * The whole sync path underneath is untouched and still compiles. Set
- * DEVCAT_SYNC_ENABLED=1 to run it anyway (integration tests do this, as does
- * anyone pointing DEVCAT_API_URL at their own host). Delete this gate when
- * devcat.dev is back.
+ * DEVCAT_SYNC_ENABLED=1 to run it anyway against a self-hosted instance —
+ * point DEVCAT_API_URL at it first. This gate is permanent for the hosted
+ * default, not a flag to delete once devcat.dev "comes back."
  */
 const SYNC_PAUSED_MESSAGE =
-  'Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.';
+  'Profile sync is retired — devcat.dev no longer hosts profiles. Your local stack report still works — run `npx devcat-cli`.';
 
 function isSyncPaused(): boolean {
   return process.env.DEVCAT_SYNC_ENABLED !== '1';
