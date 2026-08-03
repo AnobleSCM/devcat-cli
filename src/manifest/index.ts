@@ -1,6 +1,7 @@
 import { detectClaudeCode } from './claude.js';
 import { detectCodex } from './codex.js';
 import { detectCursor } from './cursor.js';
+import { detectKimiCode } from './kimi.js';
 import { dedupe } from './dedupe.js';
 import type { RootTruncation } from './dirScan.js';
 
@@ -8,7 +9,7 @@ export type { RootTruncation } from './dirScan.js';
 export { READ_CEILING, MAX_ENTRIES_EXAMINED } from './dirScan.js';
 
 /** Which AI-coding tool a manifest entry was found in. */
-export type ToolClient = 'claude-code' | 'codex' | 'cursor';
+export type ToolClient = 'claude-code' | 'codex' | 'kimi-code' | 'cursor';
 
 /**
  * A single tool surfaced from any local manifest.
@@ -74,10 +75,12 @@ export async function detect(cwd: string): Promise<DetectResult> {
     // PROJECT FIRST — closer to the user's intent.
     detectClaudeCode({ cwd, scope: 'project' }),
     detectCodex({ cwd, scope: 'project' }),
+    detectKimiCode({ cwd, scope: 'project' }),
     detectCursor({ cwd, scope: 'project' }),
     // USER SECOND.
     detectClaudeCode({ scope: 'user' }),
     detectCodex({ scope: 'user' }),
+    detectKimiCode({ scope: 'user' }),
     detectCursor({ scope: 'user' }),
   ]);
   const allTools = sources.flatMap((s) => s.tools);

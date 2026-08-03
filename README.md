@@ -2,9 +2,9 @@
 
 See your whole AI-coding stack in one command.
 
-`npx devcat-cli` scans this machine for the MCP servers, plugins, skills, and subagents you have installed across Claude Code, Codex, and Cursor, and prints them grouped in one report. No account, no sign-in, no network call.
+`npx devcat-cli` scans this machine for the MCP servers, plugins, skills, and subagents you have installed across Claude Code, Codex, Kimi Code, and Cursor, and prints them grouped in one report. No account, no sign-in, no network call.
 
-![Terminal window showing devcat-cli output: 23 tools grouped under Claude Code, Codex, and Cursor](https://raw.githubusercontent.com/AnobleSCM/devcat-cli/main/assets/devcat-report.svg)
+![Terminal window showing devcat-cli output: 26 tools grouped under Claude Code, Codex, Kimi Code, and Cursor](https://raw.githubusercontent.com/AnobleSCM/devcat-cli/main/assets/devcat-report.svg)
 
 <sub><b>Example output</b> — a real run of this CLI against a small demo machine, captured verbatim. Your report lists whatever you actually have installed.</sub>
 
@@ -20,9 +20,9 @@ That's the whole thing — the report above is what it prints.
 <summary>The same output as text</summary>
 
 ```
-devcat v0.2.2
+devcat v0.2.3
 
-✓ Your AI-coding stack — 23 tools
+✓ Your AI-coding stack — 26 tools
 
 Claude Code · 18 tools
   ██████   6 mcp      context7, github, linear, playwright, sentry, supabase
@@ -34,11 +34,14 @@ Claude Code · 18 tools
 Codex · 3 tools
   ███      3 mcp      exa, node-repl, serena
 
+Kimi Code · 3 tools
+  ███      3 mcp      browserbase, raycast, vercel
+
 Cursor · 2 tools
   ██       2 mcp      figma, postgres
 
-23 tools in Claude Code, Codex, and Cursor · 13 locations checked
-2 project-scoped · 21 user-wide
+26 tools in Claude Code, Codex, Kimi Code, and Cursor · 14 locations checked
+3 project-scoped · 23 user-wide
 
 Share it — npx devcat-cli --markdown
 ```
@@ -74,7 +77,7 @@ npx devcat-cli --markdown
 ```markdown
 ## My AI stack
 
-23 tools across Claude Code, Codex, and Cursor.
+26 tools across Claude Code, Codex, Kimi Code, and Cursor.
 
 ### Claude Code
 - **MCP servers (6):** `context7`, `github`, `linear`, `playwright`, `sentry`, `supabase`
@@ -84,6 +87,9 @@ npx devcat-cli --markdown
 
 ### Codex
 - **MCP servers (3):** `exa`, `node-repl`, `serena`
+
+### Kimi Code
+- **MCP servers (3):** `browserbase`, `raycast`, `vercel`
 
 ### Cursor
 - **MCP servers (2):** `figma`, `postgres`
@@ -101,10 +107,10 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ```json
 {
-  "cli_version": "0.2.2",
-  "total": 23,
-  "project_scoped": 2,
-  "user_scoped": 21,
+  "cli_version": "0.2.3",
+  "total": 26,
+  "project_scoped": 3,
+  "user_scoped": 23,
   "clients": [
     {
       "client": "claude-code",
@@ -139,9 +145,9 @@ Two kinds of location, read two different ways:
 
 | | Where | How |
 |---|---|---|
-| **MCP servers** | Claude Code `~/.claude.json`, `~/.claude/settings.json`, `.mcp.json` (project) · Codex `~/.codex/config.toml`, `.codex/config.toml` (project) · Cursor `~/.cursor/mcp.json`, `.cursor/mcp.json` (project) | The file is read and parsed. Only the server **names** (the keys) are kept. |
+| **MCP servers** | Claude Code `~/.claude.json`, `~/.claude/settings.json`, `.mcp.json` (project) · Codex `~/.codex/config.toml`, `.codex/config.toml` (project) · Kimi Code `~/.kimi-code/mcp.json`, `.kimi-code/mcp.json` (project — read from the exact working directory, not found by an upward walk) · Cursor `~/.cursor/mcp.json`, `.cursor/mcp.json` (project) | The file is read and parsed. Only the server **names** (the keys) are kept. Kimi Code's config is JSON, same `{ "mcpServers": {...} }` shape as Claude Code and Cursor — `config.toml` holds Kimi Code's own settings, never MCP servers. |
 | **Plugins** | Claude Code `~/.claude/plugins/installed_plugins.json` | Same — parsed, keys kept. |
-| **Skills** | Claude Code `~/.claude/skills/`, `.claude/skills/` (project) · Codex `~/.codex/skills/` | The directory is listed. A child counts as a skill if it contains a `SKILL.md`. **No file is opened** — not even the `SKILL.md`, whose presence is all that is checked. The name is the folder's. |
+| **Skills** | Claude Code `~/.claude/skills/`, `.claude/skills/` (project) · Codex `~/.codex/skills/` · Kimi Code `~/.kimi-code/skills/` and `~/.agents/skills/` (user), `.kimi-code/skills/` and `.agents/skills/` (project) | The directory is listed. A child counts as a skill if it contains a `SKILL.md`. **No file is opened** — not even the `SKILL.md`, whose presence is all that is checked. The name is the folder's. |
 | **Subagents** | Claude Code `~/.claude/agents/`, `.claude/agents/` (project) | The directory is listed. Two shapes count: `<name>.md`, where the name is the file's; and `<name>/<name>.md`, where the name is the folder's and the inner filename must match. A folder holding only other markdown — a README, notes — is not a subagent. **No file is opened.** |
 
 So: config files are read and parsed, and the only thing taken **out of their contents** is the tool's name. Directory scans open nothing at all.
@@ -161,13 +167,13 @@ The directory scans are deliberately shallow and doubly bounded. They read a kno
 
 Both sit well above the sizes these directories run to in practice — dozens of entries, not thousands — and below them the result is fully deterministic. If either bites, **the CLI says so** rather than presenting a partial list as complete: a warning naming the root and the counts goes to stderr, the terminal and markdown reports carry a footnote, and `--json` gets a `truncated` flag plus a `truncations` array carrying, per root, `entries_read` (what the ceiling counts, dot-entries included), `entries_seen` (candidates among them), `entries_kept` (examined), `hit_read_ceiling`, and `read_failed`.
 
-Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root for any location that also has a user-scope reader — `~/.claude/skills`, `~/.claude/agents`, `~/.codex/config.toml`, `~/.cursor/mcp.json` — so those are never double-counted as project config. `~/.mcp.json` has no user-scope reader, so it is still picked up by the upward walk and reported as project-scoped.
+Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it — with one exception: Kimi Code's project-local `.kimi-code/mcp.json` is read from the exact working directory only, matching Kimi Code's own behavior, never found by walking upward. `$HOME` is not treated as a project root for any location that also has a user-scope reader — `~/.claude/skills`, `~/.claude/agents`, `~/.codex/config.toml`, `~/.cursor/mcp.json`, `~/.kimi-code/mcp.json`, `~/.kimi-code/skills`, `~/.agents/skills` — so those are never double-counted as project config. `~/.mcp.json` has no user-scope reader, so it is still picked up by the upward walk and reported as project-scoped.
 
 **A tool configured in more than one place is listed once.** Identity is deterministic, so an unchanged machine produces the same report every run — as long as no root hit the read ceiling. Above that ceiling, *which* 10,000 entries were read is the directory's enumeration order, which the CLI does not control; sorting happens after. A run in that state says so rather than implying stability it does not have.
 
 - Anything found as a folder — skills, subagents — is identified by its **resolved symlink target**. Two links to one directory are one entry however they are named, and two genuinely different skills that happen to share a name both survive.
 - MCP servers and plugins are keys in a config file with no path of their own, so they are identified by (type, name) — the same identity the server matches on.
-- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory, so a skill on both shelves is listed once under Claude Code. A skill only Codex has still appears under Codex.
+- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Kimi Code before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory that Kimi Code also reads directly at `~/.agents/skills` — no farm of its own needed — so a skill any of the three can see is listed once under Claude Code. A skill only Codex (or only Kimi Code) has still appears under that client.
 
 Install it globally if you run it often:
 
@@ -198,7 +204,7 @@ The four other variables the CLI reads take effect only on `devcat sync`, whose 
 
 **The report is empty.** It lists the locations each detector resolved to — see [What it reads](#what-it-reads); intermediate parent-directory probes from the upward walk are not recorded. If your config lives somewhere else entirely, that's the gap: open an [issue](https://github.com/AnobleSCM/devcat-cli/issues) with the location and it can be added.
 
-**A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Cursor), Claude Code plugins and subagents, and skills from both the Claude Code and Codex shelves. Skills bundled inside an installed plugin are not counted separately — the plugin itself is listed.
+**A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Kimi Code, Cursor), Claude Code plugins and subagents, and skills from the Claude Code, Codex, and Kimi Code shelves. Skills bundled inside an installed plugin are not counted separately — the plugin itself is listed.
 
 <a id="profile-sync"></a>
 
