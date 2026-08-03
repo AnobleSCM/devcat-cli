@@ -1,0 +1,23 @@
+src/ui/report.ts
+  s_43d34a34188ab6::t_a38b5d6e377563 80-92,98-107,110-115,117
+  s_43d34a34188ab6::t_6a98d801932a8d 109
+test/unit/ui/report.test.ts
+  s_43d34a34188ab6::t_efedc72faa169d 151-155,166,171,178,181-182,187,190,193,197-199,202,205,215,217-254
+  s_43d34a34188ab6::t_483a1107ec0e52 2,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "44bcb27810b5013540bf89a4eb07836dadebaafc",
+  "prompts": {},
+  "sessions": {
+    "s_43d34a34188ab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a4670f5-e23e-4865-a40b-a297ab4c7c42",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
