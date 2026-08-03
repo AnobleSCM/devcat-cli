@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import { findUpward } from '../lib/findUpward.js';
+import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
+import { scanSkills, type RootTruncation } from './dirScan.js';
 import type { ToolEntry } from './index.js';
 
 interface CodexConfigToml {
@@ -12,10 +13,57 @@ interface CodexConfigToml {
 interface SourceScan {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /** Roots where a scan bound bit. Absent means nothing was left out. */
+  truncations?: RootTruncation[];
 }
 
 /**
- * Detect Codex MCP servers from config.toml.
+ * Detect Codex tooling: MCP servers from config.toml, plus installed skills
+ * under ~/.codex/skills (user scope only — Codex has no project skills root).
+ *
+ * Skills are frequently the same shelf Claude Code reads: both ~/.claude/skills
+ * and ~/.codex/skills are usually link farms pointing at one shared directory.
+ * Two dedupe passes handle that, and both are order-independent in effect:
+ *
+ *   - Within a root, scanSkills() collapses aliases by resolved path.
+ *   - Across clients, dedupe() keys path-backed entries on (type, resolved
+ *     path), keeping the first occurrence. detect() scans Claude Code before
+ *     Codex, so a skill both shelves link to the same directory is listed
+ *     once under Claude Code — deterministically, not by whichever filesystem
+ *     answered first. Two same-named skills at DIFFERENT paths are different
+ *     skills and both survive.
+ */
+export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
+  const mcp = await detectCodexMcp(opts);
+  if (opts.scope !== 'user') return mcp;
+
+  const skills = await readCodexSkillsDir(join(homedir(), '.codex', 'skills'));
+  return {
+    tools: [...mcp.tools, ...skills.tools],
+    pathsScanned: [...mcp.pathsScanned, ...skills.pathsScanned],
+    truncations: [...(mcp.truncations ?? []), ...(skills.truncations ?? [])],
+  };
+}
+
+/**
+ * Installed skills under a Codex `skills/` root. Report-only, like every
+ * skill entry — never part of the /api/sync payload (see syncableTools).
+ */
+async function readCodexSkillsDir(path: string): Promise<SourceScan> {
+  const { hits, truncation } = await scanSkills(path);
+  const tools: ToolEntry[] = hits.map((hit) => ({
+    type: 'skill' as const,
+    name: hit.name,
+    source: path,
+    scope: 'user' as const,
+    client: 'codex' as const,
+    canonicalPath: hit.realPath,
+  }));
+  return { tools, pathsScanned: [path], truncations: truncation ? [truncation] : [] };
+}
+
+/**
+ * Codex MCP servers from config.toml.
  *
  * User scope: reads ~/.codex/config.toml.
  * Project scope: walks CWD upward to find .codex/config.toml.
@@ -25,7 +73,7 @@ interface SourceScan {
  * (command, args, env, url, cwd, enabled) — we extract only the table key as
  * the tool name (CLI-05 manifest-only-sync).
  */
-export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
+async function detectCodexMcp(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
   let path: string | null;
   let scannedPath: string;
   if (opts.scope === 'user') {
@@ -34,7 +82,19 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.codex', 'config.toml');
-    scannedPath = path ?? join(opts.cwd, '.codex', 'config.toml');
+    // $HOME is an ancestor of most working directories, and running FROM
+    // $HOME the fallback candidate is the user file itself — so test the
+    // candidate, not just the hit. Canonical comparison, so a symlinked route
+    // does not slip past.
+    //
+    // Bow out entirely when it is the user location: scanning it would
+    // relabel user config as project-scoped, and reporting it as a scanned
+    // location would list the same place twice, since the user pass names it.
+    const candidate = path ?? join(opts.cwd, '.codex', 'config.toml');
+    if (await isUserLevelPath(candidate, '.codex', 'config.toml')) {
+      return { tools: [], pathsScanned: [] };
+    }
+    scannedPath = candidate;
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }
 
@@ -57,6 +117,7 @@ export async function detectCodex(opts: { cwd?: string; scope: 'project' | 'user
     name,
     source: path!,
     scope: opts.scope,
+    client: 'codex' as const,
   }));
   return { tools, pathsScanned: [scannedPath] };
 }

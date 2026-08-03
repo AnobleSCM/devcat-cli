@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { findUpward } from '../lib/findUpward.js';
+import { findUpward, isUserLevelPath } from '../lib/findUpward.js';
 import type { ToolEntry } from './index.js';
 
 interface CursorMcpFile {
@@ -11,6 +11,8 @@ interface CursorMcpFile {
 interface SourceScan {
   tools: ToolEntry[];
   pathsScanned: string[];
+  /** Cursor has no directory-shaped detections, so this is always absent. */
+  truncations?: never[];
 }
 
 /**
@@ -33,7 +35,14 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.cursor', 'mcp.json');
-    scannedPath = path ?? join(opts.cwd, '.cursor', 'mcp.json');
+    // Same guard as the Codex detector, candidate and all: run from $HOME,
+    // the fallback IS the user file, so the project pass reports nothing
+    // rather than duplicating a location the user pass already names.
+    const candidate = path ?? join(opts.cwd, '.cursor', 'mcp.json');
+    if (await isUserLevelPath(candidate, '.cursor', 'mcp.json')) {
+      return { tools: [], pathsScanned: [] };
+    }
+    scannedPath = candidate;
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }
 
@@ -56,6 +65,7 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
     name,
     source: path!,
     scope: opts.scope,
+    client: 'cursor' as const,
   }));
   return { tools, pathsScanned: [scannedPath] };
 }

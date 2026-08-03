@@ -1,4 +1,4 @@
-import { detect, type DetectResult } from '../manifest/index.js';
+import { detect, syncableTools, type SyncableToolEntry } from '../manifest/index.js';
 import {
   loadToken,
   saveToken,
@@ -47,6 +47,23 @@ export interface SyncOptions {
 }
 
 /**
+ * devcat.dev is being rebuilt, so the hosted sync endpoint is not answering.
+ * Sync stops on the one line below instead of running the device flow and
+ * failing deep inside an HTTP call — no browser, no polling, no retries.
+ *
+ * The whole sync path underneath is untouched and still compiles. Set
+ * DEVCAT_SYNC_ENABLED=1 to run it anyway (integration tests do this, as does
+ * anyone pointing DEVCAT_API_URL at their own host). Delete this gate when
+ * devcat.dev is back.
+ */
+const SYNC_PAUSED_MESSAGE =
+  'Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.';
+
+function isSyncPaused(): boolean {
+  return process.env.DEVCAT_SYNC_ENABLED !== '1';
+}
+
+/**
  * Top-level `devcat sync` orchestrator.
  *
  * Order:
@@ -60,9 +77,16 @@ export interface SyncOptions {
  *   5. Render success summary (Phase 40 D-19).
  */
 export async function runSync(opts: SyncOptions): Promise<ExitCode> {
-  // 1. Detect manifest
+  if (isSyncPaused()) {
+    writeErrorOutput({ message: SYNC_PAUSED_MESSAGE, exitCode: EXIT_GENERIC_ERROR });
+    return EXIT_GENERIC_ERROR;
+  }
+
+  // 1. Detect manifest. Skills and subagents are report-only detections, so
+  // only the syncable subset is ever considered here or sent.
   const manifest = await detect(process.cwd());
-  if (manifest.tools.length === 0) {
+  const tools = syncableTools(manifest.tools);
+  if (tools.length === 0) {
     if (isJsonMode()) {
       emitEvent({ type: 'sync.start', tool_count: 0 });
       emitEvent({
@@ -76,7 +100,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
     return EXIT_OK;
   }
   const idempotencyKey = createSyncIdempotencyKey();
-  emitEvent({ type: 'sync.start', tool_count: manifest.tools.length, idempotency_key: idempotencyKey });
+  emitEvent({ type: 'sync.start', tool_count: tools.length, idempotency_key: idempotencyKey });
 
   // 2. Ensure token
   let tokens: TokenPair;
@@ -95,7 +119,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
   try {
     const body = await postSync({
       accessToken: tokens.access_token,
-      tools: manifest.tools,
+      tools,
       idempotencyKey,
       emitStartEvent: false,
     });
@@ -108,7 +132,7 @@ export async function runSync(opts: SyncOptions): Promise<ExitCode> {
   } catch (err) {
     if (err instanceof TokenInvalidError) {
       // D-16 recovery
-      return await recoverFromTokenInvalid(tokens, manifest, opts, idempotencyKey);
+      return await recoverFromTokenInvalid(tokens, tools, opts, idempotencyKey);
     }
     return handleSyncError(err);
   }
@@ -174,7 +198,7 @@ async function runDeviceFlowInline(opts: SyncOptions): Promise<TokenPair> {
 
 async function recoverFromTokenInvalid(
   tokens: TokenPair,
-  manifest: DetectResult,
+  tools: SyncableToolEntry[],
   opts: SyncOptions,
   idempotencyKey: string,
 ): Promise<ExitCode> {
@@ -224,7 +248,7 @@ async function recoverFromTokenInvalid(
   try {
     const body = await postSync({
       accessToken: nextAccessToken,
-      tools: manifest.tools,
+      tools,
       idempotencyKey,
       emitStartEvent: false,
     });

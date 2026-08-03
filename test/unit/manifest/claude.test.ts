@@ -50,7 +50,14 @@ describe('detectClaudeCode', () => {
     const cwd = '/tmp/devcat-nonexistent-' + Date.now();
     const result = await detectClaudeCode({ cwd, scope: 'project' });
     expect(result.tools).toEqual([]);
-    expect(result.pathsScanned.length).toBe(1);
+    // Project scope checks three locations: the MCP file, the skills
+    // directory, and the agents directory. All three are reported as checked
+    // so the empty-state message can name them.
+    expect(result.pathsScanned).toEqual([
+      join(cwd, '.mcp.json'),
+      join(cwd, '.claude', 'skills'),
+      join(cwd, '.claude', 'agents'),
+    ]);
   });
 
   it('reads user-scope ~/.claude.json with HOME pointing to fixture dir, returns scope=user', async () => {

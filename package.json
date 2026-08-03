@@ -1,7 +1,7 @@
 {
   "name": "devcat-cli",
   "version": "0.1.1",
-  "description": "DevCat CLI — npx devcat-cli sync. Pushes your AI tool manifest to devcat.dev. Manifest-only sync via RFC 8628 device authorization with OS keychain credentials.",
+  "description": "See your whole AI-coding stack in one command. npx devcat-cli scans this machine for the MCP servers, plugins, skills, and subagents installed across Claude Code, Codex, and Cursor and prints them grouped — locally, with no account and no network call.",
   "license": "MIT",
   "author": "Andrew Noble (https://github.com/AnobleSCM)",
   "repository": {
@@ -55,7 +55,11 @@
     "cli",
     "devcat",
     "claude-code",
+    "codex",
+    "cursor",
     "mcp",
+    "mcp-servers",
+    "developer-tools",
     "device-flow",
     "rfc-8628"
   ]

@@ -56,9 +56,11 @@ describe('detectCodex', () => {
     homedirHolder.current = tmpHome;
     const result = await detectCodex({ scope: 'user' });
     expect(result.tools).toEqual([]);
-    expect(result.pathsScanned).toHaveLength(1);
-    expect(result.pathsScanned[0]).toContain('.codex');
-    expect(result.pathsScanned[0]).toContain('config.toml');
+    // User scope checks two locations: config.toml and the skills directory.
+    expect(result.pathsScanned).toEqual([
+      join(tmpHome, '.codex', 'config.toml'),
+      join(tmpHome, '.codex', 'skills'),
+    ]);
   });
 
   it('handles malformed TOML gracefully (returns empty)', async () => {
@@ -68,7 +70,7 @@ describe('detectCodex', () => {
     homedirHolder.current = tmpHome;
     const result = await detectCodex({ scope: 'user' });
     expect(result.tools).toEqual([]);
-    expect(result.pathsScanned.length).toBe(1);
+    expect(result.pathsScanned).toContain(join(tmpHome, '.codex', 'config.toml'));
   });
 
   // W5 fix — CONTEXT D-06 per-project Codex config support

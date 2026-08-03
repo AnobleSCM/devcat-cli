@@ -1,5 +1,5 @@
 import { v7 as uuidv7 } from 'uuid';
-import type { ToolType, SyncRequestBody, SyncResponseBody, ErrorEnvelope } from '../types/api.js';
+import type { SyncableToolType, SyncRequestBody, SyncResponseBody, ErrorEnvelope } from '../types/api.js';
 import { authenticatedFetch } from './client.js';
 import { getApiBase } from './types.js';
 import { computeManifestHash } from '../lib/manifestHash.js';
@@ -38,8 +38,12 @@ export interface PostSyncOpts {
   accessToken: string;
   idempotencyKey?: string;
   emitStartEvent?: boolean;
-  /** Accepts the manifest layer's ToolEntry shape (structural superset of API ToolEntry). */
-  tools: ReadonlyArray<{ type: ToolType; name: string }>;
+  /**
+   * Syncable detections only. Narrowed to SyncableToolType so a raw
+   * detection list — which can hold skills and subagents — does not type-check
+   * here. Callers pass syncableTools(manifest.tools).
+   */
+  tools: ReadonlyArray<{ type: SyncableToolType; name: string }>;
 }
 
 export function createSyncIdempotencyKey(): string {
