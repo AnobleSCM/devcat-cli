@@ -1,0 +1,65 @@
+test/unit/manifest/kimi.test.ts
+  s_b93cf57c6d0e9e::t_aae2033f4d8ded 1-135
+test/unit/manifest/dedupe.test.ts
+  s_b93cf57c6d0e9e::t_e9db7821897350 91-104
+src/manifest/index.ts
+  s_b93cf57c6d0e9e::t_13dce6cbf6036c 78,83
+  s_b93cf57c6d0e9e::t_b28b50d7b775dc 4,12
+src/manifest/kimi.ts
+  s_b93cf57c6d0e9e::t_1c68d37c3e79f5 1-198
+assets/devcat-report.svg
+  s_b93cf57c6d0e9e::t_480480848e3eeb 1-2,11,20-26
+  s_b93cf57c6d0e9e::t_1daa79d803eb27 10
+src/cli.ts
+  s_b93cf57c6d0e9e::t_0ea166dbd2b049 33
+src/ui/report.ts
+  s_b93cf57c6d0e9e::t_6174af91448c5d 511
+  s_b93cf57c6d0e9e::t_eaf391f3d3e08d 279
+  s_b93cf57c6d0e9e::t_7746ca91876a41 23,28
+package.json
+  s_b93cf57c6d0e9e::t_fb26cfdfe49cc2 3-4
+CHANGELOG.md
+  s_b93cf57c6d0e9e::t_db3e30ccac859c 5-28
+README.md
+  s_b93cf57c6d0e9e::t_790cdd1af3397c 110-113
+  s_b93cf57c6d0e9e::t_65e4d117381278 5,7
+  s_b93cf57c6d0e9e::t_4d0ce390bc8c54 207
+  s_b93cf57c6d0e9e::t_0f011520efcad9 170
+  s_b93cf57c6d0e9e::t_8e842e20967c31 23,25,37-39,43-44
+  s_b93cf57c6d0e9e::t_637c7f9cdb4578 176
+  s_b93cf57c6d0e9e::t_d91fe2a2a8205d 148,150
+  s_b93cf57c6d0e9e::t_09d958781981b9 80,91-92
+  s_73b0d7a1ef8289::t_1017c038ce733b 93
+src/version.ts
+  s_b93cf57c6d0e9e::t_cbf6783a583337 7
+test/unit/manifest/kimi.skills.test.ts
+  s_b93cf57c6d0e9e::t_1d7e6b7278f397 1-220
+test/unit/ui/report.test.ts
+  s_b93cf57c6d0e9e::t_03df49bf080bba 296
+package-lock.json
+  s_b93cf57c6d0e9e::t_ec4c00acbd58f6 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "53c4c30ec975c03f51ba648882681ca8db5fcfdb",
+  "prompts": {},
+  "sessions": {
+    "s_73b0d7a1ef8289": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a16d745-8079-4e1c-884b-98dc566e8149",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_b93cf57c6d0e9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6b80ecf-2fc0-45ac-bbcb-a2e964cd86a2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
