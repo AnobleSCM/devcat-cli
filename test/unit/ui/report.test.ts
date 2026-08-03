@@ -293,7 +293,7 @@ describe('renderEmptyStack — copy and home-relative paths (terminal report onl
       truncations: [],
     }).split('\n');
     expect(lines[lines.length - 1]).toBe(
-      'Add an MCP server to Claude Code, Codex, or Cursor and run this again.',
+      'Add an MCP server to Claude Code, Codex, Kimi Code, or Cursor and run this again.',
     );
     expect(lines.join('\n')).not.toContain('Share it');
   });

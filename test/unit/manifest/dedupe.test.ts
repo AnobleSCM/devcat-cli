@@ -88,6 +88,20 @@ describe('dedupe — canonical path identity', () => {
     expect(result.map((t) => t.type)).toEqual(['skill', 'subagent']);
   });
 
+  it('collapses THREE aliases of one canonical skill across Claude Code, Codex, and Kimi Code', () => {
+    // The shared shelf is now reachable from three harnesses: Claude Code
+    // and Codex through their own link farms, Kimi Code by reading the
+    // canonical directory directly. Whichever client detect() scans first
+    // wins — dedupe() itself only sees three entries at one canonical path.
+    const viaClaude = skill('panel', '/canon/skills/panel', 'claude-code');
+    const viaCodex = skill('panel', '/canon/skills/panel', 'codex');
+    const viaKimi = skill('panel', '/canon/skills/panel', 'kimi-code');
+
+    const result = dedupe([viaClaude, viaCodex, viaKimi]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.client).toBe('claude-code');
+  });
+
   it('still collapses same-path entries of the SAME type', () => {
     const shared = '/canon/panel';
     const viaClaude = skill('panel', shared, 'claude-code');

@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.3]
+
+Kimi Code joins Claude Code, Codex, and Cursor as a fourth scanned harness —
+detection parity only, no product expansion.
+
+- New scanner detects Kimi Code MCP servers and skills. MCP servers are read
+  from `mcp.json` files (Kimi's actual config shape — JSON, not TOML, and
+  never `config.toml`, which holds no MCP declarations): `~/.kimi-code/mcp.json`
+  at user scope, and `<cwd>/.kimi-code/mcp.json` at project scope — read
+  literally from the working directory, not found by an upward walk, matching
+  Kimi's own documented behavior
+- Skills are read from both roots Kimi auto-discovers: `.kimi-code/skills`
+  and `.agents/skills`, at user and project scope. `~/.agents/skills` is the
+  same shared shelf Claude Code and Codex already reach through their own
+  link farms — the existing canonical-path dedupe now collapses a skill
+  across all three harnesses, deterministically, under whichever client
+  `detect()` scans first
+- Terminal report, `--markdown`, `--json`, and the empty-state "Looked in"
+  listing all gain a Kimi Code section using the existing type accents — no
+  new colors
+- Not scanned: Kimi's `.agents/agents` / `.kimi-code/agents` subagent roots.
+  They are real and auto-discovered the same way the skill roots are, but
+  subagent detection is outside this release's scope
+
 ## [0.2.2]
 
 Presentation-only polish pass on the local stack report. Nothing about what is

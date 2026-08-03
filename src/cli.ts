@@ -30,7 +30,7 @@ export function buildProgram(sink: ExitCodeSink): Command {
   program
     .name('devcat')
     .description(
-      'DevCat CLI — see your whole AI-coding stack in one command. Scans this machine for the MCP servers, plugins, skills, and subagents installed across Claude Code, Codex, and Cursor.',
+      'DevCat CLI — see your whole AI-coding stack in one command. Scans this machine for the MCP servers, plugins, skills, and subagents installed across Claude Code, Codex, Kimi Code, and Cursor.',
     )
     .version(CLI_VERSION);
 

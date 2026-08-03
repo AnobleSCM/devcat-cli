@@ -20,11 +20,12 @@ import { c, SUCCESS_GLYPH } from './colors.js';
  */
 
 /** Fixed display order so two runs on the same machine print identically. */
-const CLIENT_ORDER: readonly ToolClient[] = ['claude-code', 'codex', 'cursor'];
+const CLIENT_ORDER: readonly ToolClient[] = ['claude-code', 'codex', 'kimi-code', 'cursor'];
 
 const CLIENT_LABEL: Record<ToolClient, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
+  'kimi-code': 'Kimi Code',
   cursor: 'Cursor',
 };
 
@@ -275,7 +276,7 @@ function masthead(): string {
  *     ██████  12 mcp      alpha, beta, gamma, …
  *     ██       4 plugin   swift-lsp, vercel
  *
- *   21 tools in Claude Code, Codex, and Cursor · 8 locations checked
+ *   21 tools in Claude Code, Codex, Kimi Code, and Cursor · 8 locations checked
  *   3 project-scoped · 18 user-wide
  *
  *   Share it — npx devcat-cli --markdown
@@ -507,7 +508,7 @@ function renderEmptyStack(result: DetectResult): string {
   }
 
   lines.push('');
-  lines.push(c.dim('Add an MCP server to Claude Code, Codex, or Cursor and run this again.'));
+  lines.push(c.dim('Add an MCP server to Claude Code, Codex, Kimi Code, or Cursor and run this again.'));
   return lines.join('\n');
 }
 
