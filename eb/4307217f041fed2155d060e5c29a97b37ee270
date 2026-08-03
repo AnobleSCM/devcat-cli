@@ -1,0 +1,23 @@
+src/cli.ts
+  s_8ba42ddaefda86::t_16675327e5544f 10-11,14-17,26-28
+src/manifest/dirScan.ts
+  s_8ba42ddaefda86::t_4ae28ffd6d72b9 159-163
+test/integration/cli.entrypoint.test.ts
+  s_8ba42ddaefda86::t_16675327e5544f 11-14,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "eb4307217f041fed2155d060e5c29a97b37ee270",
+  "prompts": {},
+  "sessions": {
+    "s_8ba42ddaefda86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6248b98-9e6e-48be-8a8f-3d21acdff0b3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
