@@ -82,10 +82,19 @@ async function detectCodexMcp(opts: { cwd?: string; scope: 'project' | 'user' })
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.codex', 'config.toml');
-    // $HOME is an ancestor of most working directories; the user pass above
-    // already reads that exact file, so don't relabel it project-scoped.
-    if (path && (await isUserLevelPath(path, '.codex', 'config.toml'))) path = null;
-    scannedPath = path ?? join(opts.cwd, '.codex', 'config.toml');
+    // $HOME is an ancestor of most working directories, and running FROM
+    // $HOME the fallback candidate is the user file itself — so test the
+    // candidate, not just the hit. Canonical comparison, so a symlinked route
+    // does not slip past.
+    //
+    // Bow out entirely when it is the user location: scanning it would
+    // relabel user config as project-scoped, and reporting it as a scanned
+    // location would list the same place twice, since the user pass names it.
+    const candidate = path ?? join(opts.cwd, '.codex', 'config.toml');
+    if (await isUserLevelPath(candidate, '.codex', 'config.toml')) {
+      return { tools: [], pathsScanned: [] };
+    }
+    scannedPath = candidate;
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }
 

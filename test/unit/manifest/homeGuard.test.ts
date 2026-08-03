@@ -162,16 +162,92 @@ describe('$HOME is not a project root — when cwd IS $HOME', () => {
 });
 
 describe('$HOME is not a project root — Codex and Cursor from $HOME', () => {
-  it('neither claims its user config as project-scoped when cwd is $HOME', async () => {
+  function seedUserConfigs(): void {
     mkdirSync(join(tmpHome, '.codex'), { recursive: true });
     writeFileSync(join(tmpHome, '.codex', 'config.toml'), '[mcp_servers.serena]\n');
     mkdirSync(join(tmpHome, '.cursor'), { recursive: true });
     writeFileSync(join(tmpHome, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { figma: {} } }));
+  }
 
+  it('neither claims its user config as project-scoped when cwd is $HOME', async () => {
+    seedUserConfigs();
     const { detectCodex } = await import('../../../src/manifest/codex.js');
     const { detectCursor } = await import('../../../src/manifest/cursor.js');
     expect((await detectCodex({ cwd: tmpHome, scope: 'project' })).tools).toEqual([]);
     expect((await detectCursor({ cwd: tmpHome, scope: 'project' })).tools).toEqual([]);
+  });
+
+  it('neither REPORTS the user location from the project pass', async () => {
+    // Attribution was already right, but the project pass still named the
+    // user file as a location it checked — and the user pass names it too,
+    // so the same place was listed twice.
+    seedUserConfigs();
+    const { detectCodex } = await import('../../../src/manifest/codex.js');
+    const { detectCursor } = await import('../../../src/manifest/cursor.js');
+    expect((await detectCodex({ cwd: tmpHome, scope: 'project' })).pathsScanned).toEqual([]);
+    expect((await detectCursor({ cwd: tmpHome, scope: 'project' })).pathsScanned).toEqual([]);
+  });
+
+  it('a real project config under $HOME is still reported as a scanned location', async () => {
+    seedUserConfigs();
+    mkdirSync(join(cwd, '.codex'), { recursive: true });
+    writeFileSync(join(cwd, '.codex', 'config.toml'), '[mcp_servers.repo-local]\n');
+
+    const { detectCodex } = await import('../../../src/manifest/codex.js');
+    const result = await detectCodex({ cwd, scope: 'project' });
+    expect(result.pathsScanned).toEqual([join(cwd, '.codex', 'config.toml')]);
+  });
+
+  it('a missing project config still reports the candidate it looked for', async () => {
+    // Only the user-root case is silent. An ordinary miss must still say
+    // where it looked, which is what the empty-state message is built from.
+    const { detectCursor } = await import('../../../src/manifest/cursor.js');
+    const result = await detectCursor({ cwd, scope: 'project' });
+    expect(result.pathsScanned).toEqual([join(cwd, '.cursor', 'mcp.json')]);
+  });
+});
+
+describe('locations are reported once each when run from $HOME', () => {
+  it('a full scan from $HOME lists every location exactly once', async () => {
+    // README promises paths_checked holds one entry per config file or
+    // directory consulted. Running from $HOME is where that was false.
+    mkdirSync(join(tmpHome, '.codex'), { recursive: true });
+    writeFileSync(join(tmpHome, '.codex', 'config.toml'), '[mcp_servers.serena]\n');
+    mkdirSync(join(tmpHome, '.cursor'), { recursive: true });
+    writeFileSync(join(tmpHome, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { figma: {} } }));
+    const skills = join(tmpHome, '.claude', 'skills', 'panel');
+    mkdirSync(skills, { recursive: true });
+    writeFileSync(join(skills, 'SKILL.md'), '# panel\n');
+    mkdirSync(join(tmpHome, '.claude', 'agents'), { recursive: true });
+    writeFileSync(join(tmpHome, '.claude', 'agents', 'debugger.md'), 'x');
+
+    const { detect } = await import('../../../src/manifest/index.js');
+    const result = await detect(tmpHome);
+
+    const duplicates = result.pathsScanned.filter(
+      (p, i) => result.pathsScanned.indexOf(p) !== i,
+    );
+    expect(duplicates).toEqual([]);
+    expect(new Set(result.pathsScanned).size).toBe(result.pathsScanned.length);
+
+    // The four guarded user locations each appear exactly once.
+    for (const location of [
+      join(tmpHome, '.claude', 'skills'),
+      join(tmpHome, '.claude', 'agents'),
+      join(tmpHome, '.codex', 'config.toml'),
+      join(tmpHome, '.cursor', 'mcp.json'),
+    ]) {
+      expect(result.pathsScanned.filter((p) => p === location)).toHaveLength(1);
+    }
+  });
+
+  it('lists each location once from a directory nested under $HOME too', async () => {
+    mkdirSync(join(tmpHome, '.codex'), { recursive: true });
+    writeFileSync(join(tmpHome, '.codex', 'config.toml'), '[mcp_servers.serena]\n');
+
+    const { detect } = await import('../../../src/manifest/index.js');
+    const result = await detect(cwd);
+    expect(new Set(result.pathsScanned).size).toBe(result.pathsScanned.length);
   });
 });
 

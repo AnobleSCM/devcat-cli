@@ -35,9 +35,14 @@ export async function detectCursor(opts: { cwd?: string; scope: 'project' | 'use
   } else {
     if (!opts.cwd) return { tools: [], pathsScanned: [] };
     path = await findUpward(opts.cwd, '.cursor', 'mcp.json');
-    // Same $HOME-is-an-ancestor guard as the Codex detector.
-    if (path && (await isUserLevelPath(path, '.cursor', 'mcp.json'))) path = null;
-    scannedPath = path ?? join(opts.cwd, '.cursor', 'mcp.json');
+    // Same guard as the Codex detector, candidate and all: run from $HOME,
+    // the fallback IS the user file, so the project pass reports nothing
+    // rather than duplicating a location the user pass already names.
+    const candidate = path ?? join(opts.cwd, '.cursor', 'mcp.json');
+    if (await isUserLevelPath(candidate, '.cursor', 'mcp.json')) {
+      return { tools: [], pathsScanned: [] };
+    }
+    scannedPath = candidate;
     if (!path) return { tools: [], pathsScanned: [scannedPath] };
   }
 
