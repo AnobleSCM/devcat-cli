@@ -7,12 +7,14 @@ import { EXIT_GENERIC_ERROR, EXIT_OK, type ExitCode } from './lib/exitCodes.js';
 
 /**
  * Commander wiring, separated from the bin entrypoint so tests can run the
- * real parser over a real argv array. bin/devcat.ts is then a three-line
- * shim whose only extra job is turning the returned code into process.exit —
+ * real parser over a real argv array. bin/devcat.ts is then a small shim
+ * whose only extra job is assigning the returned code to process.exitCode —
  * the part that cannot run inside a test process.
  *
- * Actions return exit codes rather than calling process.exit themselves for
- * the same reason.
+ * Actions record an exit code rather than terminating the process, so the
+ * parser is testable and every exit flows through one place. Nothing here
+ * calls process.exit: doing so after writing stdout can truncate a piped
+ * report (see bin/devcat.ts).
  */
 export interface ExitCodeSink {
   code: ExitCode;
@@ -21,9 +23,9 @@ export interface ExitCodeSink {
 export function buildProgram(sink: ExitCodeSink): Command {
   const program = new Command();
   // Without this commander calls process.exit() itself on a bad flag, on
-  // --help, and on --version, which makes the parser impossible to test and
-  // takes the exit path out of one place. With it, those become throws that
-  // runCli turns into a returned code.
+  // --help, and on --version — untestable, and a hard exit that could cut a
+  // half-written stdout. With it, those become throws that runCli turns into
+  // a returned code, which the shim assigns to process.exitCode.
   program.exitOverride();
   program
     .name('devcat')

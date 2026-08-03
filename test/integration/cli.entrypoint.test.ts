@@ -8,8 +8,10 @@ import { join } from 'node:path';
  * the default-command dispatch, and the flag wiring are all exercised —
  * not just the command function underneath them.
  *
- * runCli() is the whole of bin/devcat.ts apart from the process.exit call,
- * which cannot run inside a test process.
+ * runCli() is the whole of bin/devcat.ts apart from assigning the returned
+ * code to process.exitCode, which cannot be exercised in-process here.
+ * bin.exit.test.ts covers that assignment, and why it is an assignment
+ * rather than a process.exit call.
  */
 const homedirHolder: { current: string | null } = { current: null };
 
@@ -115,7 +117,7 @@ describe('CLI entrypoint — real commander parse', () => {
 
   it('an unknown flag returns exit 1 without killing the process', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => {
-      throw new Error('process.exit must not be called from runCli');
+      throw new Error('runCli must return an exit code, never terminate the process');
     }) as never);
     const errSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {

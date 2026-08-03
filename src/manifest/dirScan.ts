@@ -156,6 +156,11 @@ async function readCandidateNames(
   try {
     for (;;) {
       if (read >= readCeiling) {
+        // Deliberately conservative at the boundary: a directory holding
+        // exactly `readCeiling` entries is flagged truncated even though
+        // nothing was actually missed. Checking would cost the extra read
+        // this gate exists to prevent, and over-disclosing is the safe
+        // direction — it never hides a tool.
         hitReadCeiling = true;
         await iterator.return?.();
         break;
