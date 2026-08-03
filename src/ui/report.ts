@@ -64,14 +64,23 @@ const TYPE_WIDTH = 9;
 const ROW_INDENT = 2;
 /** Cells in the proportional count bar. Full block = one cell, half block = a half. */
 const BAR_WIDTH = 6;
-/** Width of the count column — three digits, right-aligned. */
-const COUNT_WIDTH = 3;
+/**
+ * Minimum width of the count column, right-aligned. A report whose biggest
+ * count needs more digits widens the column rather than overflowing it — a
+ * four-digit count in a three-wide column would push that one row's label and
+ * names a character right of every other row, and out of line with its own
+ * wrapped continuation.
+ */
+const MIN_COUNT_WIDTH = 3;
+
 /**
  * Column where the comma-separated names start (and continuation lines indent
  * to). Derived from the columns before it — indent, bar, gap, count, gap,
  * label — so widening any of them cannot silently break the alignment.
  */
-const NAME_COLUMN = ROW_INDENT + BAR_WIDTH + 1 + COUNT_WIDTH + 1 + TYPE_WIDTH;
+function nameColumn(countWidth: number): number {
+  return ROW_INDENT + BAR_WIDTH + 1 + countWidth + 1 + TYPE_WIDTH;
+}
 
 /**
  * Both blocks are in CP437, so they render even in a legacy Windows console
@@ -283,8 +292,11 @@ export function renderStackReport(result: DetectResult): string {
   lines.push(`${SUCCESS_GLYPH} ${c.bold(`Your AI-coding stack — ${plural(total, 'tool')}`)}`);
 
   // One scale for every bar in the report, so two rows of equal length mean
-  // equal counts wherever they sit.
+  // equal counts wherever they sit — and one column width, wide enough for
+  // the longest count, so every row lines up with every other.
   const maxTypeCount = Math.max(...groups.flatMap((g) => g.byType.map((t) => t.names.length)));
+  const countWidth = Math.max(MIN_COUNT_WIDTH, String(maxTypeCount).length);
+  const nameStart = nameColumn(countWidth);
 
   for (const group of groups) {
     lines.push('');
@@ -295,13 +307,13 @@ export function renderStackReport(result: DetectResult): string {
       // glyphs, so a stripped line is the plain line, space for space.
       const bar = renderBar(names.length, maxTypeCount);
       const barCell = `${accent(bar)}${' '.repeat(BAR_WIDTH - bar.length)}`;
-      const count = c.bold(String(names.length).padStart(COUNT_WIDTH));
+      const count = c.bold(String(names.length).padStart(countWidth));
       const label = accent(type.padEnd(TYPE_WIDTH));
       const prefix = `${' '.repeat(ROW_INDENT)}${barCell} ${count} ${label}`;
-      const wrapped = wrap(names.map(sanitizeName).join(', '), WRAP_WIDTH - NAME_COLUMN);
+      const wrapped = wrap(names.map(sanitizeName).join(', '), WRAP_WIDTH - nameStart);
       lines.push(`${prefix}${wrapped[0]}`);
       for (const cont of wrapped.slice(1)) {
-        lines.push(`${' '.repeat(NAME_COLUMN)}${cont}`);
+        lines.push(`${' '.repeat(nameStart)}${cont}`);
       }
     }
   }

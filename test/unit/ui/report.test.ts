@@ -227,6 +227,27 @@ describe('count bars — one scale for the whole report', () => {
     expect(out).toEqual(['██████', '██████']);
   });
 
+  it('widens the count column rather than overflowing it, keeping every row aligned', () => {
+    // A four-digit count in a three-wide column used to push that row's label
+    // and names one character right of every other row — including its own
+    // wrapped continuation.
+    const out = renderStackReport(
+      stack([
+        { client: 'claude-code', type: 'skill', n: 1000 },
+        { client: 'claude-code', type: 'mcp', n: 1 },
+      ]),
+    ).split('\n');
+    const typeRows = out.filter((l) => /^ {2}[█▌]/.test(l));
+    const labelColumns = typeRows.map((l) => l.indexOf(/mcp/.test(l) ? 'mcp' : 'skill'));
+    expect(new Set(labelColumns).size).toBe(1);
+    // Continuation lines indent to the same widened name column.
+    const nameColumn = labelColumns[0]! + 9;
+    for (const line of out.filter((l) => /^ +s\d/.test(l))) {
+      expect(line.startsWith(' '.repeat(nameColumn))).toBe(true);
+      expect(line[nameColumn]).not.toBe(' ');
+    }
+  });
+
   it('never lets a bar row exceed the wrap width', () => {
     const wide = stack([{ client: 'claude-code', type: 'subagent', n: 40 }]);
     for (const line of renderStackReport(wide).split('\n')) {
