@@ -72,7 +72,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ```json
 {
-  "cli_version": "0.1.1",
+  "cli_version": "0.2.0",
   "total": 23,
   "project_scoped": 2,
   "user_scoped": 21,
