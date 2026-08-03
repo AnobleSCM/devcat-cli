@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { authenticatedFetch } from '../../../src/api/client.js';
+import { CLI_VERSION } from '../../../src/version.js';
 
 const API_BASE = 'https://devcat.dev';
 const server = setupServer();
@@ -20,7 +21,11 @@ describe('authenticatedFetch', () => {
       }),
     );
     await authenticatedFetch(`${API_BASE}/probe`);
-    expect(capturedUA).toMatch(/^devcat-cli\/0\.2\.1 \((darwin|linux|win32); node /);
+    // Against CLI_VERSION rather than a literal: version.parity.test.ts is
+    // what pins that constant to package.json, so a release bump should not
+    // also have to remember this file.
+    expect(capturedUA.startsWith(`devcat-cli/${CLI_VERSION} `)).toBe(true);
+    expect(capturedUA).toMatch(/^devcat-cli\/\S+ \((darwin|linux|win32); node /);
   });
 
   it('sets Authorization: Bearer when bearerToken passed', async () => {

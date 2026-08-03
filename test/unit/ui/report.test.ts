@@ -7,7 +7,9 @@ import {
   renderStackJson,
   truncationWarnings,
   toHomeRelative,
+  toCwdRelative,
 } from '../../../src/ui/report.js';
+import { CLI_VERSION } from '../../../src/version.js';
 import type { DetectResult, ToolEntry } from '../../../src/manifest/index.js';
 
 // Vitest fork pools leave process.stdout.isTTY undefined so colors auto-strip;
@@ -77,6 +79,21 @@ describe('groupStack', () => {
 });
 
 describe('renderStackReport (default `npx devcat-cli` output)', () => {
+  it('opens with the wordmark and version, above the result line', () => {
+    // A screenshot of this report should say what produced it, and which
+    // version — the report is the thing people share.
+    const lines = renderStackReport(MIXED).split('\n');
+    expect(lines[0]).toBe(`devcat v${CLI_VERSION}`);
+    expect(lines[1]).toBe('');
+    expect(lines[2]).toContain('Your AI-coding stack');
+  });
+
+  it('closes on a dim share hint naming the markdown flag', () => {
+    const lines = renderStackReport(MIXED).split('\n');
+    expect(lines[lines.length - 1]).toBe('Share it — npx devcat-cli --markdown');
+    expect(lines[lines.length - 2]).toBe('');
+  });
+
   it('prints a header, a section per client, and a totals footer', () => {
     const out = renderStackReport(MIXED);
     expect(out).toContain('Your AI-coding stack — 7 tools');
@@ -95,6 +112,15 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     expect(out).toMatch(/1 skill\s+deep-research/);
     // 'subagent' is exactly as wide as the type column, so it still needs a gap.
     expect(out).toMatch(/1 subagent\s+code-reviewer/);
+  });
+
+  it('draws a proportional bar in front of each count', () => {
+    // MIXED's largest single type count is 2 (Claude Code's MCP servers), so
+    // that row fills the bar and every 1-count row draws half of it.
+    const out = renderStackReport(MIXED);
+    expect(out).toContain('██████   2 mcp');
+    expect(out).toContain('███      1 plugin');
+    expect(out).toContain('███      1 subagent');
   });
 
   it('reports the project-scoped split only when something is project-scoped', () => {
@@ -120,8 +146,8 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
     for (const line of nameLines) expect(line.length).toBeLessThanOrEqual(78);
     // Every wrapped line after the first starts exactly at the name column.
     for (const line of nameLines.slice(1)) {
-      expect(line.startsWith(' '.repeat(15))).toBe(true);
-      expect(line[15]).not.toBe(' ');
+      expect(line.startsWith(' '.repeat(22))).toBe(true);
+      expect(line[22]).not.toBe(' ');
     }
     // Wrapping must not drop or duplicate entries.
     expect(nameLines.join(' ').match(/mcp-server-number-/g)).toHaveLength(20);
@@ -147,6 +173,89 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
   });
 });
 
+describe('count bars — one scale for the whole report', () => {
+  function stack(counts: { client: ToolEntry['client']; type: ToolEntry['type']; n: number }[]): DetectResult {
+    return {
+      tools: counts.flatMap(({ client, type, n }) =>
+        Array.from({ length: n }, (_, i) => tool({ name: `${client}-${type}-${i}`, client, type })),
+      ),
+      pathsScanned: ['~/.claude.json'],
+      truncations: [],
+    };
+  }
+
+  /** The bar cell of every type row, in report order. */
+  function bars(result: DetectResult): string[] {
+    return renderStackReport(result)
+      .split('\n')
+      .map((l) => /^ {2}([█▌]+) /.exec(l))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => m[1]!);
+  }
+
+  it('scales every bar against the largest count anywhere, not per client', () => {
+    // Codex's 3 MCP servers must not draw as wide as Claude Code's 12 just
+    // because each is the biggest thing in its own section.
+    const out = bars(
+      stack([
+        { client: 'claude-code', type: 'mcp', n: 12 },
+        { client: 'codex', type: 'mcp', n: 3 },
+      ]),
+    );
+    expect(out).toEqual(['██████', '█▌']);
+  });
+
+  it('keeps a half block for any nonzero count, however small its share', () => {
+    // A row that exists has to be visible; 1-in-100 would otherwise round to
+    // an empty bar and read as a rendering bug.
+    const out = bars(
+      stack([
+        { client: 'claude-code', type: 'mcp', n: 100 },
+        { client: 'codex', type: 'mcp', n: 1 },
+      ]),
+    );
+    expect(out).toEqual(['██████', '▌']);
+  });
+
+  it('draws a full bar when every type has the same count', () => {
+    const out = bars(
+      stack([
+        { client: 'claude-code', type: 'mcp', n: 4 },
+        { client: 'claude-code', type: 'skill', n: 4 },
+      ]),
+    );
+    expect(out).toEqual(['██████', '██████']);
+  });
+
+  it('widens the count column rather than overflowing it, keeping every row aligned', () => {
+    // A four-digit count in a three-wide column used to push that row's label
+    // and names one character right of every other row — including its own
+    // wrapped continuation.
+    const out = renderStackReport(
+      stack([
+        { client: 'claude-code', type: 'skill', n: 1000 },
+        { client: 'claude-code', type: 'mcp', n: 1 },
+      ]),
+    ).split('\n');
+    const typeRows = out.filter((l) => /^ {2}[█▌]/.test(l));
+    const labelColumns = typeRows.map((l) => l.indexOf(/mcp/.test(l) ? 'mcp' : 'skill'));
+    expect(new Set(labelColumns).size).toBe(1);
+    // Continuation lines indent to the same widened name column.
+    const nameColumn = labelColumns[0]! + 9;
+    for (const line of out.filter((l) => /^ +s\d/.test(l))) {
+      expect(line.startsWith(' '.repeat(nameColumn))).toBe(true);
+      expect(line[nameColumn]).not.toBe(' ');
+    }
+  });
+
+  it('never lets a bar row exceed the wrap width', () => {
+    const wide = stack([{ client: 'claude-code', type: 'subagent', n: 40 }]);
+    for (const line of renderStackReport(wide).split('\n')) {
+      expect([...line].length).toBeLessThanOrEqual(78);
+    }
+  });
+});
+
 describe('renderEmptyStack — copy and home-relative paths (terminal report only)', () => {
   // Built from node:path primitives rather than hardcoded POSIX literals:
   // toHomeRelative keys off path.sep, and a hardcoded '/' fixture silently
@@ -165,6 +274,28 @@ describe('renderEmptyStack — copy and home-relative paths (terminal report onl
   it('uses warm, honest, marketing-free copy', () => {
     const out = renderStackReport({ tools: [], pathsScanned: [join(HOME, '.claude.json')], truncations: [] });
     expect(out).toContain('No AI tooling detected on this machine yet.');
+  });
+
+  it('carries the same wordmark header as a full report', () => {
+    const lines = renderStackReport({
+      tools: [],
+      pathsScanned: [join(HOME, '.claude.json')],
+      truncations: [],
+    }).split('\n');
+    expect(lines[0]).toBe(`devcat v${CLI_VERSION}`);
+    expect(lines[1]).toBe('');
+  });
+
+  it('ends on the next step rather than a share hint — there is nothing to share yet', () => {
+    const lines = renderStackReport({
+      tools: [],
+      pathsScanned: [join(HOME, '.claude.json')],
+      truncations: [],
+    }).split('\n');
+    expect(lines[lines.length - 1]).toBe(
+      'Add an MCP server to Claude Code, Codex, or Cursor and run this again.',
+    );
+    expect(lines.join('\n')).not.toContain('Share it');
   });
 
   it('keeps the Looked in: transparency section', () => {
@@ -215,6 +346,94 @@ describe('renderEmptyStack — copy and home-relative paths (terminal report onl
       renderStackJson({ tools: [], pathsScanned: [join(HOME, '.claude.json')], truncations: [] }),
     );
     expect(parsed.paths_checked).toEqual([join(HOME, '.claude.json')]);
+  });
+});
+
+describe('renderEmptyStack — project paths print relative to the current directory', () => {
+  // Same platform-aware construction as the home-relative block: the marker
+  // is `.${sep}`, so a POSIX-literal fixture would silently pass on win32
+  // while asserting nothing.
+  const HOME = join(sep, 'Users', 'testuser');
+  const CWD = join(HOME, 'Developer', 'my-project');
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    homedirHolder.current = HOME;
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(CWD);
+  });
+
+  afterEach(() => {
+    homedirHolder.current = null;
+    cwdSpy.mockRestore();
+  });
+
+  function lookedIn(pathsScanned: string[]): string[] {
+    return renderStackReport({ tools: [], pathsScanned, truncations: [] })
+      .split('\n')
+      .filter((l) => l.startsWith('  - '))
+      .map((l) => l.slice(4));
+  }
+
+  it('shows a scanned path under the current directory as ./-relative', () => {
+    expect(lookedIn([join(CWD, '.mcp.json'), join(CWD, '.cursor', 'mcp.json')])).toEqual([
+      `.${sep}.mcp.json`,
+      `.${sep}.cursor${sep}mcp.json`,
+    ]);
+  });
+
+  it('prefers ./ over ~/ when a path sits under both', () => {
+    // The project directory is inside $HOME, so both rules match. The more
+    // specific answer is the useful one.
+    expect(lookedIn([join(CWD, '.mcp.json')])).toEqual([`.${sep}.mcp.json`]);
+  });
+
+  it('still prints user-wide locations home-relative', () => {
+    expect(lookedIn([join(HOME, '.claude', 'skills')])).toEqual([`~${sep}.claude${sep}skills`]);
+  });
+
+  it('renders the current directory itself as bare .', () => {
+    expect(lookedIn([CWD])).toEqual(['.']);
+  });
+
+  it('falls back to ~ when the current directory IS $HOME', () => {
+    // `cd ~ && npx devcat-cli`: "./.claude.json" would be true and useless.
+    cwdSpy.mockReturnValue(HOME);
+    expect(lookedIn([join(HOME, '.claude.json')])).toEqual([`~${sep}.claude.json`]);
+  });
+
+  it('leaves a location above the current directory home-relative, not ./', () => {
+    // The upward walk reaches ancestors; those are genuinely not "here".
+    const ancestor = join(HOME, 'Developer', '.mcp.json');
+    expect(lookedIn([ancestor])).toEqual([`~${sep}Developer${sep}.mcp.json`]);
+  });
+});
+
+describe('toCwdRelative — same boundary and case rules as toHomeRelative', () => {
+  const CWD = join(sep, 'srv', 'project');
+
+  it('rewrites a path under the base directory', () => {
+    expect(toCwdRelative(join(CWD, '.mcp.json'), CWD, 'sensitive')).toBe(`.${sep}.mcp.json`);
+  });
+
+  it('renders the base directory itself as bare .', () => {
+    expect(toCwdRelative(CWD, CWD, 'sensitive')).toBe('.');
+  });
+
+  it('does not rewrite a sibling that merely shares the prefix', () => {
+    // /srv/project2 next to /srv/project must not become ".2".
+    const sibling = `${CWD}2${sep}.mcp.json`;
+    expect(toCwdRelative(sibling, CWD, 'sensitive')).toBe(sibling);
+  });
+
+  it('leaves a path outside the base directory alone', () => {
+    const outside = join(sep, 'opt', 'shared', '.mcp.json');
+    expect(toCwdRelative(outside, CWD, 'sensitive')).toBe(outside);
+  });
+
+  it('folds case in insensitive mode and preserves the original casing after the prefix', () => {
+    const shouted = `${CWD.toUpperCase()}${sep}MixedCase.JSON`;
+    expect(toCwdRelative(shouted, CWD, 'insensitive')).toBe(`.${sep}MixedCase.JSON`);
+    expect(toCwdRelative(shouted, CWD, 'sensitive')).toBe(shouted);
   });
 });
 
