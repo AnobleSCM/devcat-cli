@@ -1,0 +1,26 @@
+package.json
+  s_d0f986f367b470::t_c1cee69ff26948 11
+  s_d0f986f367b470::t_c2986156d1c889 3
+README.md
+  s_d0f986f367b470::t_5a7376e2f02c22 75
+CHANGELOG.md
+  s_d0f986f367b470::t_b41a638a1db72e 1-16
+package-lock.json
+  s_d0f986f367b470::t_d4bd548f892cdb 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a361f742a1c476551b141add58347600ad7f4df0",
+  "prompts": {},
+  "sessions": {
+    "s_d0f986f367b470": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d03e6b5b-a493-458a-af49-768dbd78bf8b",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
