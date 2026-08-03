@@ -1,6 +1,6 @@
 {
   "name": "devcat-cli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "See your whole AI-coding stack in one command. npx devcat-cli scans this machine for the MCP servers, plugins, skills, and subagents installed across Claude Code, Codex, and Cursor and prints them grouped — locally, with no account and no network call.",
   "license": "MIT",
   "author": "Andrew Noble (https://github.com/AnobleSCM)",
@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/AnobleSCM/devcat-cli.git"
   },
-  "homepage": "https://devcat.dev",
+  "homepage": "https://github.com/AnobleSCM/devcat-cli",
   "bugs": "https://github.com/AnobleSCM/devcat-cli/issues",
   "type": "commonjs",
   "engines": {
