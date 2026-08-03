@@ -1,0 +1,45 @@
+src/manifest/kimi.ts
+  s_375b8ab9f0d75e::t_b8baa98eddb290 1
+  s_375b8ab9f0d75e::t_571cb6b575af0e 69-78,81,86-99
+  s_375b8ab9f0d75e::t_d96e91b90184cd 100
+test/unit/manifest/kimi.marker.test.ts
+  s_375b8ab9f0d75e::t_912af7d4d2e06a 1-147
+README.md
+  s_375b8ab9f0d75e::t_c592e897ece7da 148,150,153
+  s_375b8ab9f0d75e::t_5f7d23920328cc 154
+test/unit/manifest/kimi.test.ts
+  s_375b8ab9f0d75e::t_13946a38a26af1 57-60
+  s_375b8ab9f0d75e::t_35dbcfc5c412a1 111-114
+test/integration/kimi-marker-gate.test.ts
+  s_375b8ab9f0d75e::t_451a1fb8c12d4a 85-89
+  s_375b8ab9f0d75e::t_8ec6775a14c983 1-84,90-197
+CHANGELOG.md
+  s_375b8ab9f0d75e::t_37993df1a2ddd7 5-28
+src/version.ts
+  s_375b8ab9f0d75e::t_e87513c7c7c777 7
+package.json
+  s_375b8ab9f0d75e::t_b00662b27b2d95 3
+test/unit/manifest/kimi.skills.test.ts
+  s_375b8ab9f0d75e::t_f6d7d9de6e17e0 52-55
+  s_375b8ab9f0d75e::t_e4902c6d4b0561 106-107
+  s_375b8ab9f0d75e::t_fe1ab7a196e8a4 188,193-195,205-222
+  s_375b8ab9f0d75e::t_ca8067d95a674a 223-224
+package-lock.json
+  s_375b8ab9f0d75e::t_222c15a150ad65 3,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ed520e564bf0fb236cbca4d3ec7541a3e046e54c",
+  "prompts": {},
+  "sessions": {
+    "s_375b8ab9f0d75e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3dc4551-0e59-46ee-a863-a945650afed6",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
