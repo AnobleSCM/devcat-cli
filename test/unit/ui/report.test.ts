@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   groupStack,
   renderStackReport,
@@ -11,6 +11,17 @@ import type { DetectResult, ToolEntry } from '../../../src/manifest/index.js';
 // Vitest fork pools leave process.stdout.isTTY undefined so colors auto-strip;
 // NO_COLOR is belt-and-suspenders for any CI shape where isTTY is truthy.
 process.env.NO_COLOR = '1';
+
+// Only the home-relative-path tests below care what homedir() returns; every
+// other test in this file uses fixture paths that never match a real home
+// dir, so this mock is a no-op for them (same pattern as the integration
+// suite's homedirHolder).
+const homedirHolder: { current: string | null } = { current: null };
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => homedirHolder.current ?? actual.homedir() };
+});
 
 function tool(partial: Partial<ToolEntry> & Pick<ToolEntry, 'name'>): ToolEntry {
   return {
@@ -127,10 +138,74 @@ describe('renderStackReport (default `npx devcat-cli` output)', () => {
 
   it('empty scan: names the paths it checked instead of printing an empty stack', () => {
     const out = renderStackReport({ tools: [], pathsScanned: ['/p/.mcp.json', '~/.cursor/mcp.json'], truncations: [] });
-    expect(out).toContain('No AI tooling detected.');
+    expect(out).toContain('No AI tooling detected on this machine yet.');
     expect(out).toContain('/p/.mcp.json');
     expect(out).toContain('~/.cursor/mcp.json');
     expect(out).not.toContain('Your AI-coding stack');
+  });
+});
+
+describe('renderEmptyStack — copy and home-relative paths (terminal report only)', () => {
+  const HOME = '/Users/testuser';
+
+  beforeEach(() => {
+    homedirHolder.current = HOME;
+  });
+
+  afterEach(() => {
+    homedirHolder.current = null;
+  });
+
+  it('uses warm, honest, marketing-free copy', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [`${HOME}/.claude.json`], truncations: [] });
+    expect(out).toContain('No AI tooling detected on this machine yet.');
+  });
+
+  it('keeps the Looked in: transparency section', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [`${HOME}/.claude.json`], truncations: [] });
+    expect(out).toContain('Looked in:');
+  });
+
+  it('shows paths under $HOME as home-relative', () => {
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: [`${HOME}/.claude.json`, `${HOME}/.claude/skills`],
+      truncations: [],
+    });
+    expect(out).toContain('~/.claude.json');
+    expect(out).toContain('~/.claude/skills');
+    expect(out).not.toContain(HOME);
+  });
+
+  it('leaves paths outside $HOME absolute', () => {
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: ['/opt/shared/.mcp.json'],
+      truncations: [],
+    });
+    expect(out).toContain('/opt/shared/.mcp.json');
+  });
+
+  it('does not rewrite a sibling directory that merely shares the home prefix', () => {
+    // /Users/testuser2 must not become ~2 from a naive (non-boundary) prefix match.
+    const out = renderStackReport({
+      tools: [],
+      pathsScanned: [`${HOME}2/.mcp.json`],
+      truncations: [],
+    });
+    expect(out).toContain(`${HOME}2/.mcp.json`);
+  });
+
+  it('renders the home directory itself as bare ~', () => {
+    const out = renderStackReport({ tools: [], pathsScanned: [HOME], truncations: [] });
+    expect(out).toContain('  - ~');
+  });
+
+  it('does not home-relativize paths_checked in --json output', () => {
+    const parsed = JSON.parse(
+      renderStackJson({ tools: [], pathsScanned: [`${HOME}/.claude.json`], truncations: [] }),
+    );
+    expect(parsed.paths_checked).toEqual([`${HOME}/.claude.json`]);
   });
 });
 
@@ -291,7 +366,7 @@ describe('truncation disclosure', () => {
       pathsScanned: ['~/.claude/skills'],
       truncations: TRUNCATED.truncations,
     });
-    expect(out).toContain('No AI tooling detected.');
+    expect(out).toContain('No AI tooling detected on this machine yet.');
     expect(out).toContain('1 location was truncated');
     expect(out).toContain('some tools are not listed');
   });
