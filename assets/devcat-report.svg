@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="693" height="413" viewBox="0 0 693 413" role="img" aria-label="Terminal showing npx devcat-cli example output: 23 tools across Claude Code, Codex, and Cursor">
+  <rect width="693" height="413" rx="10" fill="#0d1117"/>
+  <path d="M0 10a10 10 0 0 1 10-10h673a10 10 0 0 1 10 10v28H0Z" fill="#161b22"/>
+  <line x1="0" y1="38" x2="693" y2="38" stroke="#30363d" stroke-width="1"/>
+  <circle cx="20" cy="19" r="5.5" fill="#ff5f57"/>
+  <circle cx="39" cy="19" r="5.5" fill="#febc2e"/>
+  <circle cx="58" cy="19" r="5.5" fill="#28c840"/>
+  <text x="346.5" y="23" text-anchor="middle" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace" font-size="12">npx devcat-cli</text>
+  <g font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace" font-size="14" fill="#c9d1d9">
+  <text x="20" y="52" textLength="291.06" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#3fb950" xml:space="preserve">✓</tspan><tspan fill="#c9d1d9" xml:space="preserve"> </tspan><tspan fill="#f0f6fc" font-weight="600" xml:space="preserve">Your AI-coding stack — 23 tools</tspan></text>
+  <text x="20" y="94" textLength="194.04" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#f0f6fc" font-weight="600" xml:space="preserve">Claude Code</tspan><tspan fill="#c9d1d9" xml:space="preserve"> </tspan><tspan fill="#8b949e" xml:space="preserve">· 18 tools</tspan></text>
+  <text x="20" y="115" textLength="608.58" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    6 mcp      context7, github, linear, playwright, sentry, supabase</tspan></text>
+  <text x="20" y="136" textLength="538.02" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    3 plugin   pr-review-toolkit, superpowers, typescript-lsp</tspan></text>
+  <text x="20" y="157" textLength="652.68" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    6 skill    brainstorming, deep-research, handoff, research-notes, tdd,</tspan></text>
+  <text x="20" y="178" textLength="246.96" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">               writing-plans</tspan></text>
+  <text x="20" y="199" textLength="467.46" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    3 subagent code-reviewer, debugger, test-engineer</tspan></text>
+  <text x="20" y="241" textLength="132.30" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#f0f6fc" font-weight="600" xml:space="preserve">Codex</tspan><tspan fill="#c9d1d9" xml:space="preserve"> </tspan><tspan fill="#8b949e" xml:space="preserve">· 3 tools</tspan></text>
+  <text x="20" y="262" textLength="326.34" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    3 mcp      exa, node-repl, serena</tspan></text>
+  <text x="20" y="304" textLength="141.12" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#f0f6fc" font-weight="600" xml:space="preserve">Cursor</tspan><tspan fill="#c9d1d9" xml:space="preserve"> </tspan><tspan fill="#8b949e" xml:space="preserve">· 2 tools</tspan></text>
+  <text x="20" y="325" textLength="264.60" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#c9d1d9" xml:space="preserve">    2 mcp      figma, postgres</tspan></text>
+  <text x="20" y="367" textLength="573.30" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#8b949e" xml:space="preserve">23 tools in Claude Code, Codex, and Cursor · 13 locations checked</tspan></text>
+  <text x="20" y="388" textLength="273.42" lengthAdjust="spacingAndGlyphs" xml:space="preserve"><tspan fill="#8b949e" xml:space="preserve">2 project-scoped · 21 user-wide</tspan></text>
+  </g>
+</svg>
