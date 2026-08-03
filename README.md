@@ -4,13 +4,20 @@ See your whole AI-coding stack in one command.
 
 `npx devcat-cli` scans this machine for the MCP servers, plugins, skills, and subagents you have installed across Claude Code, Codex, and Cursor, and prints them grouped in one report. No account, no sign-in, no network call.
 
+![Terminal window showing devcat-cli output: 23 tools grouped under Claude Code, Codex, and Cursor](https://raw.githubusercontent.com/AnobleSCM/devcat-cli/main/assets/devcat-report.svg)
+
+<sub><b>Example output</b> — a real run of this CLI against a small demo machine, captured verbatim. Your report lists whatever you actually have installed.</sub>
+
 ## Quickstart
 
 ```bash
 npx devcat-cli
 ```
 
-That's the whole thing. Output:
+That's the whole thing — the report above is what it prints.
+
+<details>
+<summary>The same output as text</summary>
 
 ```
 ✓ Your AI-coding stack — 23 tools
@@ -32,7 +39,25 @@ Cursor · 2 tools
 2 project-scoped · 21 user-wide
 ```
 
+</details>
+
 Requires Node.js 20 or later. Works on macOS, Linux, and Windows.
+
+## An inventory, not a security scanner
+
+DevCat answers *what do I have installed*. A security scanner answers *is any of it dangerous*. Those are different jobs, and the two complement each other rather than compete.
+
+| | DevCat (`devcat` report) | Security scanners |
+|---|---|---|
+| **What it produces** | A list of what is installed | An assessment of what those tools can do — permissions, risks, supply chain |
+| **Account** | None | Often require one |
+| **Network** | None on the default command | May call remote services |
+| **MCP servers** | Never executes one | May start a server to observe how it behaves |
+| **Config contents** | Names only — `command`, `args`, `env`, and every other field are dropped at the parser | May inspect contents in full |
+
+The right-hand column is hedged on purpose — scanners differ, and none of this describes any particular one. The left-hand column is exactly what this codebase does: every row is spelled out in [What it reads](#what-it-reads) and [Security](#security), against source anyone can read.
+
+So: to judge whether a tool is safe to run, use a scanner. To find out what is on the machine in the first place, start here.
 
 ## Share it
 
@@ -100,7 +125,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 | `devcat` | Scan and print your stack. Same as `devcat report`. |
 | `devcat report --markdown` | Print the shareable "My AI stack" snippet instead. |
 | `devcat report --json` | Print the scan as one JSON object. |
-| `devcat sync` | Push your manifest to devcat.dev. **Paused** — see below. |
+| `devcat sync` | Push your manifest to devcat.dev. **Paused** — see [Profile sync](#profile-sync). |
 | `devcat logout` | Clear local DevCat credentials. |
 | `devcat --version` / `--help` | Version, help. |
 
@@ -147,29 +172,13 @@ npm install -g devcat-cli
 devcat
 ```
 
-## Profile sync
-
-`devcat sync` pushes your manifest to a devcat.dev profile. **That site is being rebuilt, so sync is paused** — it stops immediately with one line rather than starting a sign-in it can't finish:
-
-```
-✗ Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.
-```
-
-Nothing else is affected: the scan, `--markdown`, and `logout` all work offline as normal. Sync returns with the site.
-
-The sync path itself is intact — [RFC 8628 device authorization](https://datatracker.ietf.org/doc/html/rfc8628), tokens in your OS keychain via [`@napi-rs/keyring`](https://www.npmjs.com/package/@napi-rs/keyring), no plaintext token on disk. If you run your own instance, point `DEVCAT_API_URL` at it and set `DEVCAT_SYNC_ENABLED=1` to run the full flow.
-
-Sync sends MCP servers and plugins only. Skills and subagents are local report detections — they are folders on your machine with no catalog entry behind them, and they never enter the sync payload.
-
 ## Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `NO_COLOR` | unset | Disable color output ([no-color.org](https://no-color.org/) standard). |
-| `DEVCAT_SYNC_ENABLED` | unset | Set to `1` to run `devcat sync` against a live API instead of stopping at the paused message. |
-| `DEVCAT_API_URL` | `https://devcat.dev` | Override the API base URL (staging / self-hosted). HTTPS required except `http://localhost:*`. |
-| `DEVCAT_TOKEN` | unset | CI escape hatch — bypass keychain and use this access token directly. |
-| `DEVCAT_DEBUG` | unset | Verbose logging without the `--verbose` flag. |
+
+The four other variables the CLI reads take effect only on `devcat sync`, which is paused — they are documented under [Profile sync](#profile-sync).
 
 ## Security
 
@@ -186,6 +195,37 @@ Sync sends MCP servers and plugins only. Skills and subagents are local report d
 **The report is empty.** It lists the locations each detector resolved to — see [What it reads](#what-it-reads); intermediate parent-directory probes from the upward walk are not recorded. If your config lives somewhere else entirely, that's the gap: open an [issue](https://github.com/AnobleSCM/devcat-cli/issues) with the location and it can be added.
 
 **A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Cursor), Claude Code plugins and subagents, and skills from both the Claude Code and Codex shelves. Skills bundled inside an installed plugin are not counted separately — the plugin itself is listed.
+
+<a id="profile-sync"></a>
+
+## Profile sync — paused while devcat.dev is rebuilt
+
+Every other command in this README works offline and needs no account. This section covers `devcat sync` — the only command that talks to a server, and the only part of the CLI currently unavailable.
+
+`devcat sync` pushes your manifest to a devcat.dev profile. **That site is being rebuilt, so sync is paused** — it stops immediately with one line rather than starting a sign-in it can't finish:
+
+```
+✗ Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.
+```
+
+Nothing else is affected: the scan, `--markdown`, and `logout` all work offline as normal. Sync returns with the site.
+
+The sync path itself is intact — [RFC 8628 device authorization](https://datatracker.ietf.org/doc/html/rfc8628), tokens in your OS keychain via [`@napi-rs/keyring`](https://www.npmjs.com/package/@napi-rs/keyring), no plaintext token on disk. If you run your own instance, point `DEVCAT_API_URL` at it and set `DEVCAT_SYNC_ENABLED=1` to run the full flow.
+
+Sync sends MCP servers and plugins only. Skills and subagents are local report detections — they are folders on your machine with no catalog entry behind them, and they never enter the sync payload.
+
+### Sync environment variables
+
+These four are read only on the sync and sign-in paths; none of them changes what the report prints.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DEVCAT_SYNC_ENABLED` | unset | Set to `1` to run `devcat sync` against a live API instead of stopping at the paused message. |
+| `DEVCAT_API_URL` | `https://devcat.dev` | Override the API base URL (staging / self-hosted). HTTPS required except `http://localhost:*`. |
+| `DEVCAT_TOKEN` | unset | CI escape hatch — bypass keychain and use this access token directly. |
+| `DEVCAT_DEBUG` | unset | Verbose logging without the `--verbose` flag. |
+
+### Sync troubleshooting
 
 **`OS keychain unavailable` on Linux.** Only affects `sync`. Install libsecret: `sudo apt install libsecret-1-0` (Debian/Ubuntu), `sudo pacman -S libsecret` (Arch), or `sudo dnf install libsecret` (Fedora).
 
