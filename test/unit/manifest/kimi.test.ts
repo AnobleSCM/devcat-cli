@@ -54,6 +54,10 @@ describe('detectKimiCode — MCP servers', () => {
 
   it('handles missing mcp.json gracefully (returns empty, pathsScanned lists all user locations)', async () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'devcat-kimi-missing-'));
+    // The install marker itself is present — this is a machine with Kimi
+    // Code installed that just hasn't written an mcp.json yet — so the
+    // gate opens and the normal graceful-miss behavior below is exercised.
+    mkdirSync(join(tmpHome, '.kimi-code'), { recursive: true });
     homedirHolder.current = tmpHome;
     const result = await detectKimiCode({ scope: 'user' });
     expect(result.tools).toEqual([]);
@@ -104,6 +108,10 @@ describe('detectKimiCode — MCP servers', () => {
       );
       const childDir = join(parentDir, 'child');
       mkdirSync(childDir, { recursive: true });
+      // The child's OWN install marker — opens the gate for this cwd
+      // without giving it the parent's mcp.json, so the assertion below is
+      // still testing "no upward walk", not "no marker".
+      mkdirSync(join(childDir, '.kimi-code'), { recursive: true });
 
       const result = await detectKimiCode({ cwd: childDir, scope: 'project' });
       // Unlike Codex/Cursor/Claude's project MCP detectors, this is a

@@ -49,6 +49,10 @@ describe('detectKimiCode — skills', () => {
     const skillsRoot = join(tmpHome, '.agents', 'skills');
     mkdirSync(skillsRoot, { recursive: true });
     makeSkill(skillsRoot, 'demo-generic-skill');
+    // Install marker: this machine genuinely has Kimi Code, which is what
+    // makes it safe for the generic root to be attributed to it — see
+    // kimi.marker.test.ts for the no-marker case, where it must not be.
+    mkdirSync(join(tmpHome, '.kimi-code'), { recursive: true });
 
     const { detectKimiCode } = await import('../../../src/manifest/kimi.js');
     const result = await detectKimiCode({ scope: 'user' });
@@ -99,6 +103,8 @@ describe('detectKimiCode — skills', () => {
     symlinkSync(join(tmpHome, 'gone'), join(shelf, 'dangling'));
     mkdirSync(join(shelf, '.system'), { recursive: true });
     writeFileSync(join(shelf, 'AGENTS.md'), 'not a skill');
+    // Install marker — see kimi.marker.test.ts for the no-marker case.
+    mkdirSync(join(tmpHome, '.kimi-code'), { recursive: true });
 
     const { detectKimiCode } = await import('../../../src/manifest/kimi.js');
     const result = await detectKimiCode({ scope: 'user' });
@@ -179,11 +185,14 @@ describe('shared shelf — Claude Code, Codex, and Kimi Code all reach one direc
     expect(result.tools.find((t) => t.type === 'skill' && t.name === 'handoff')!.client).toBe('claude-code');
   });
 
-  it('a skill only Kimi Code reaches (no Claude/Codex farm entry) still appears, under Kimi Code', async () => {
+  it('a skill only Kimi Code reaches (no Claude/Codex farm entry) still appears, under Kimi Code, when Kimi is genuinely installed', async () => {
     const canon = join(tmpHome, '.agents', 'skills');
     mkdirSync(canon, { recursive: true });
     makeSkill(canon, 'kimi-only-skill');
     // Deliberately no .claude/skills or .codex/skills farm entries at all.
+    // Install marker — the machine genuinely has Kimi Code, which is what
+    // makes attributing this skill to it correct rather than a phantom.
+    mkdirSync(join(tmpHome, '.kimi-code'), { recursive: true });
 
     const { detect } = await import('../../../src/manifest/index.js');
     const result = await detect(join(tmpHome, 'nowhere'));
@@ -191,6 +200,26 @@ describe('shared shelf — Claude Code, Codex, and Kimi Code all reach one direc
     const skill = result.tools.find((t) => t.type === 'skill' && t.name === 'kimi-only-skill');
     expect(skill).toBeDefined();
     expect(skill!.client).toBe('kimi-code');
+  });
+
+  it('(a) the same skill, with NO Kimi marker anywhere, is invisible — undercount-honest, not misattributed to Kimi Code', async () => {
+    // This is the exact phantom-attribution shape the marker gate exists to
+    // close: a skill only reachable through ~/.agents/skills (no Claude or
+    // Codex farm symlink names it), on a machine with no ~/.kimi-code —
+    // e.g. skills.sh installed it for Cline, Warp, Zed, Dexto, or Loaf, none
+    // of which devcat scans. Before the gate this surfaced as Kimi Code
+    // regardless of whether Kimi was ever installed.
+    const canon = join(tmpHome, '.agents', 'skills');
+    mkdirSync(canon, { recursive: true });
+    makeSkill(canon, 'skillssh-only-skill');
+    // Deliberately no .kimi-code marker anywhere in this fixture.
+
+    const { detect } = await import('../../../src/manifest/index.js');
+    const result = await detect(join(tmpHome, 'nowhere'));
+
+    expect(result.tools.find((t) => t.name === 'skillssh-only-skill')).toBeUndefined();
+    expect(result.tools).toEqual([]);
+    expect(result.pathsScanned.some((p) => p.includes('.kimi-code'))).toBe(false);
   });
 
   it('is stable across repeated scans', async () => {

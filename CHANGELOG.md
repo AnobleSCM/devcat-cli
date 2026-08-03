@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.4]
+
+Fixes a false attribution introduced in 0.2.3: the Kimi Code scanner ran
+unconditionally, so it could claim Kimi Code was installed when it never was.
+
+- The Kimi Code scanner (MCP servers and skills, both scopes) now runs only
+  when its own install marker exists on disk — `~/.kimi-code` at user scope,
+  `.kimi-code` under the current directory at project scope — checked
+  independently, so a project-only marker still scans that project with the
+  user pass gated closed, and vice versa
+- The bug: `~/.agents/skills` is not Kimi's own directory. It is the shared
+  install target [skills.sh](https://github.com/vercel-labs/skills.sh) uses
+  for several non-Kimi tools (Cline, Warp, Zed, Dexto, Loaf), so a user with
+  one of those installed and no Kimi Code at all saw a phantom "Kimi Code"
+  section. At user scope this was usually masked by scan-order dedupe
+  (Claude Code's link farm wins); at project scope there was no dedupe to
+  mask it, and devcat's own test suite already proved the misattribution
+- Without the marker, Kimi Code now contributes nothing — no section in any
+  report, no path in the empty-state "Looked in" list, no entry in `--json`
+  `paths_checked`. The skill goes undetected rather than misattributed:
+  undercount-honest, the same "no path is claimed unless it was actually
+  checked" rule `paths_checked` already followed for every other client
+- With the marker present, output is unchanged from 0.2.3
+
 ## [0.2.3]
 
 Kimi Code joins Claude Code, Codex, and Cursor as a fourth scanned harness —
