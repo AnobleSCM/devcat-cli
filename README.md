@@ -125,7 +125,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 | `devcat` | Scan and print your stack. Same as `devcat report`. |
 | `devcat report --markdown` | Print the shareable "My AI stack" snippet instead. |
 | `devcat report --json` | Print the scan as one JSON object. |
-| `devcat sync` | Push your manifest to devcat.dev. **Paused** — see [Profile sync](#profile-sync). |
+| `devcat sync` | Push your manifest to devcat.dev. **Retired** — see [Profile sync](#profile-sync). |
 | `devcat logout` | Clear local DevCat credentials. |
 | `devcat --version` / `--help` | Version, help. |
 
@@ -178,7 +178,7 @@ devcat
 |---|---|---|
 | `NO_COLOR` | unset | Disable color output ([no-color.org](https://no-color.org/) standard). |
 
-The four other variables the CLI reads take effect only on `devcat sync`, which is paused — they are documented under [Profile sync](#profile-sync).
+The four other variables the CLI reads take effect only on `devcat sync`, whose hosted default is retired — they are documented under [Profile sync](#profile-sync).
 
 ## Security
 
@@ -198,19 +198,19 @@ The four other variables the CLI reads take effect only on `devcat sync`, which 
 
 <a id="profile-sync"></a>
 
-## Profile sync — paused while devcat.dev is rebuilt
+## Profile sync — retired
 
-Every other command in this README works offline and needs no account. This section covers `devcat sync` — the only command that talks to a server, and the only part of the CLI currently unavailable.
+Every other command in this README works offline and needs no account. This section covers `devcat sync` — the only command that talks to a server, and the only one whose hosted default is retired.
 
-`devcat sync` pushes your manifest to a devcat.dev profile. **That site is being rebuilt, so sync is paused** — it stops immediately with one line rather than starting a sign-in it can't finish:
+`devcat sync` pushed your manifest to a devcat.dev profile. **devcat.dev no longer hosts profiles — the hosted service is retired.** By default, `sync` now stops immediately with one line rather than starting a sign-in it can't finish:
 
 ```
-✗ Profile sync is paused while devcat.dev is rebuilt. Your local stack report still works — run `npx devcat-cli`.
+✗ Profile sync is retired — devcat.dev no longer hosts profiles. Your local stack report still works — run `npx devcat-cli`.
 ```
 
-Nothing else is affected: the scan, `--markdown`, and `logout` all work offline as normal. Sync returns with the site.
+Nothing else is affected: the scan, `--markdown`, and `logout` all work offline as normal.
 
-The sync path itself is intact — [RFC 8628 device authorization](https://datatracker.ietf.org/doc/html/rfc8628), tokens in your OS keychain via [`@napi-rs/keyring`](https://www.npmjs.com/package/@napi-rs/keyring), no plaintext token on disk. If you run your own instance, point `DEVCAT_API_URL` at it and set `DEVCAT_SYNC_ENABLED=1` to run the full flow.
+The sync path itself is intact — [RFC 8628 device authorization](https://datatracker.ietf.org/doc/html/rfc8628), tokens in your OS keychain via [`@napi-rs/keyring`](https://www.npmjs.com/package/@napi-rs/keyring), no plaintext token on disk. The hosted service is retired, but the self-host path remains: if you run your own instance, point `DEVCAT_API_URL` at it and set `DEVCAT_SYNC_ENABLED=1` to run the full flow.
 
 Sync sends MCP servers and plugins only. Skills and subagents are local report detections — they are folders on your machine with no catalog entry behind them, and they never enter the sync payload.
 
@@ -220,7 +220,7 @@ These four are read only on the sync and sign-in paths; none of them changes wha
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DEVCAT_SYNC_ENABLED` | unset | Set to `1` to run `devcat sync` against a live API instead of stopping at the paused message. |
+| `DEVCAT_SYNC_ENABLED` | unset | Set to `1` to run `devcat sync` against a live API instead of stopping at the retired message. |
 | `DEVCAT_API_URL` | `https://devcat.dev` | Override the API base URL (staging / self-hosted). HTTPS required except `http://localhost:*`. |
 | `DEVCAT_TOKEN` | unset | CI escape hatch — bypass keychain and use this access token directly. |
 | `DEVCAT_DEBUG` | unset | Verbose logging without the `--verbose` flag. |
