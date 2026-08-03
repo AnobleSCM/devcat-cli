@@ -1,0 +1,32 @@
+src/ui/report.ts
+  s_b0cc069485b4f5::t_ef26b6e018c4b8 310,313,316
+  s_b0cc069485b4f5::t_d269f059845416 68-75,81-83
+  s_b0cc069485b4f5::t_e1dd0ca002d4a5 295-296,298-299
+  s_f34bc80f9d1be5::t_282b9196e2484a 67
+test/unit/ui/report.test.ts
+  s_b0cc069485b4f5::t_8382c5d1439991 230-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "53469f564482451d6bfa0679f344704ee479f28d",
+  "prompts": {},
+  "sessions": {
+    "s_b0cc069485b4f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87f4dd2-a0ee-4340-a6b7-18d3cb841bc2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    },
+    "s_f34bc80f9d1be5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "283ad027-046e-43e3-9e07-749c78efe6d8",
+        "model": "claude-fable-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
