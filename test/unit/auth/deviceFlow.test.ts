@@ -9,6 +9,7 @@ import {
   CodeAlreadyUsedError,
   ClockDriftError,
 } from '../../../src/auth/deviceFlow.js';
+import { CLI_VERSION } from '../../../src/version.js';
 
 const API_BASE = 'https://devcat.dev';
 const server = setupServer();
@@ -263,7 +264,10 @@ describe('pollForToken', () => {
     const body = capturedBody as {
       client_metadata?: { cli_version?: string; hostname?: string; platform?: string };
     };
-    expect(body.client_metadata?.cli_version).toBe('0.2.1');
+    // Against CLI_VERSION rather than a literal: version.parity.test.ts is
+    // what pins that constant to package.json, so a release bump should not
+    // also have to remember this file.
+    expect(body.client_metadata?.cli_version).toBe(CLI_VERSION);
     expect(['darwin', 'linux', 'win32']).toContain(body.client_metadata?.platform);
     expect(typeof body.client_metadata?.hostname).toBe('string');
   });

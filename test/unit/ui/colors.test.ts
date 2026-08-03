@@ -35,6 +35,9 @@ describe('colors — TTY + NO_COLOR gating', () => {
   it('emits ANSI codes on a real TTY with NO_COLOR unset', async () => {
     const { c, SUCCESS_GLYPH, FAILURE_GLYPH } = await loadColors({ isTTY: true });
     expect(c.cyan('mcp')).toContain(`${ESC}[`);
+    expect(c.magenta('plugin')).toContain(`${ESC}[`);
+    expect(c.green('skill')).toContain(`${ESC}[`);
+    expect(c.blue('subagent')).toContain(`${ESC}[`);
     expect(c.bold('7')).toContain(`${ESC}[`);
     expect(c.dim('x')).toContain(`${ESC}[`);
     expect(SUCCESS_GLYPH).toContain(`${ESC}[`);
@@ -44,6 +47,9 @@ describe('colors — TTY + NO_COLOR gating', () => {
   it('stays plain when stdout is not a TTY', async () => {
     const { c, SUCCESS_GLYPH, FAILURE_GLYPH } = await loadColors({ isTTY: false });
     expect(c.cyan('mcp')).toBe('mcp');
+    expect(c.magenta('plugin')).toBe('plugin');
+    expect(c.green('skill')).toBe('skill');
+    expect(c.blue('subagent')).toBe('subagent');
     expect(c.bold('7')).toBe('7');
     expect(SUCCESS_GLYPH).toBe('✓');
     expect(FAILURE_GLYPH).toBe('✗');
@@ -52,6 +58,8 @@ describe('colors — TTY + NO_COLOR gating', () => {
   it('NO_COLOR forces plain output even on a TTY', async () => {
     const { c, SUCCESS_GLYPH } = await loadColors({ isTTY: true, noColor: '1' });
     expect(c.cyan('mcp')).toBe('mcp');
+    expect(c.magenta('plugin')).toBe('plugin');
+    expect(c.blue('subagent')).toBe('subagent');
     expect(c.bold('7')).toBe('7');
     expect(SUCCESS_GLYPH).toBe('✓');
   });
@@ -59,5 +67,7 @@ describe('colors — TTY + NO_COLOR gating', () => {
   it('an empty-string NO_COLOR still forces plain output on a TTY', async () => {
     const { c } = await loadColors({ isTTY: true, noColor: '' });
     expect(c.cyan('mcp')).toBe('mcp');
+    expect(c.magenta('plugin')).toBe('plugin');
+    expect(c.blue('subagent')).toBe('subagent');
   });
 });

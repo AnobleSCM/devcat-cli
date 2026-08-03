@@ -39,12 +39,63 @@ const TYPE_LABEL_MARKDOWN: Record<ToolType, string> = {
   subagent: 'Subagents',
 };
 
+/**
+ * One accent per tool type, used for both the type label and its count bar so
+ * the two always agree. Drawn from the standard ANSI 16 (see colors.ts): each
+ * of these four reads on a light and a dark background, which `white`, `black`
+ * and `yellow` do not.
+ *
+ * Color is never the only signal — every row still spells its type out, and
+ * every bar is a length as well as a hue — so the report survives NO_COLOR, a
+ * pipe, and a reader who cannot distinguish two of the four.
+ */
+const TYPE_ACCENT: Record<ToolType, (s: string) => string> = {
+  mcp: c.cyan,
+  plugin: c.magenta,
+  skill: c.green,
+  subagent: c.blue,
+};
+
 /** Total line width the terminal report wraps to. */
 const WRAP_WIDTH = 78;
 /** Width of the type label column — one wider than the longest type name. */
 const TYPE_WIDTH = 9;
-/** Column where the comma-separated names start (and continuation lines indent to). */
-const NAME_COLUMN = 15;
+/** Indent of every type row under its client heading. */
+const ROW_INDENT = 2;
+/** Cells in the proportional count bar. Full block = one cell, half block = a half. */
+const BAR_WIDTH = 6;
+/** Width of the count column — three digits, right-aligned. */
+const COUNT_WIDTH = 3;
+/**
+ * Column where the comma-separated names start (and continuation lines indent
+ * to). Derived from the columns before it — indent, bar, gap, count, gap,
+ * label — so widening any of them cannot silently break the alignment.
+ */
+const NAME_COLUMN = ROW_INDENT + BAR_WIDTH + 1 + COUNT_WIDTH + 1 + TYPE_WIDTH;
+
+/**
+ * Both blocks are in CP437, so they render even in a legacy Windows console
+ * with a raster font — unlike the finer eighth-blocks (U+2589-U+258F), which
+ * are not.
+ */
+const BAR_FULL = '█';
+const BAR_HALF = '▌';
+
+/**
+ * A count as a bar, scaled against the largest single type count anywhere in
+ * the report — not the largest within its own client. Local scaling would draw
+ * Codex's 3 MCP servers as wide as Claude Code's 12, which is the one thing a
+ * bar chart must never do.
+ *
+ * Any nonzero count keeps at least a half block: a row that exists must be
+ * visible, however it compares to the biggest one.
+ */
+function renderBar(count: number, max: number): string {
+  if (count <= 0 || max <= 0) return '';
+  const cells = Math.max(0.5, Math.round((count / max) * BAR_WIDTH * 2) / 2);
+  const full = Math.floor(cells);
+  return `${BAR_FULL.repeat(full)}${cells > full ? BAR_HALF : ''}`;
+}
 
 export interface StackTypeGroup {
   type: ToolType;
@@ -111,10 +162,62 @@ export function toHomeRelative(
   home: string,
   caseSensitivity: PathCaseSensitivity = defaultPathCaseSensitivity(),
 ): string {
-  const fold = caseSensitivity === 'insensitive' ? (s: string) => s.toLowerCase() : (s: string) => s;
-  if (fold(path) === fold(home)) return '~';
-  const prefix = home.endsWith(sep) ? home : `${home}${sep}`;
-  return fold(path).startsWith(fold(prefix)) ? `~${sep}${path.slice(prefix.length)}` : path;
+  return toPrefixRelative(path, home, '~', caseSensitivity);
+}
+
+/**
+ * Display-only: rewrite a path under `cwd` to start with `.`, so a project
+ * config reads as `.${sep}.mcp.json` rather than as the machine-specific
+ * absolute path it was resolved from. Same boundary and case rules as
+ * {@link toHomeRelative} — a sibling directory sharing the prefix stays
+ * absolute.
+ *
+ * The marker is `.${sep}`, not a hardcoded `./`: on win32 the idiomatic
+ * relative form is `.\`, and mixing separators in one printed path is how a
+ * report starts looking machine-generated.
+ */
+export function toCwdRelative(
+  path: string,
+  cwd: string,
+  caseSensitivity: PathCaseSensitivity = defaultPathCaseSensitivity(),
+): string {
+  return toPrefixRelative(path, cwd, '.', caseSensitivity);
+}
+
+function fold(s: string, caseSensitivity: PathCaseSensitivity): string {
+  return caseSensitivity === 'insensitive' ? s.toLowerCase() : s;
+}
+
+function toPrefixRelative(
+  path: string,
+  base: string,
+  marker: string,
+  caseSensitivity: PathCaseSensitivity,
+): string {
+  if (fold(path, caseSensitivity) === fold(base, caseSensitivity)) return marker;
+  const prefix = base.endsWith(sep) ? base : `${base}${sep}`;
+  return fold(path, caseSensitivity).startsWith(fold(prefix, caseSensitivity))
+    ? `${marker}${sep}${path.slice(prefix.length)}`
+    : path;
+}
+
+/**
+ * How one scanned location prints in the empty-state report. Project-scoped
+ * candidates come back as absolute paths under the current directory, which
+ * tell the reader nothing they do not already know; `.${sep}.mcp.json` says
+ * "here" in the width of two characters.
+ *
+ * cwd wins over home when a path sits under both, being the more specific of
+ * the two answers — except when the two are the same directory, where `~`
+ * is the more informative marker for a config that is user-wide by nature.
+ */
+function displayPath(path: string, home: string, cwd: string): string {
+  const caseSensitivity = defaultPathCaseSensitivity();
+  if (fold(cwd, caseSensitivity) !== fold(home, caseSensitivity)) {
+    const relative = toCwdRelative(path, cwd, caseSensitivity);
+    if (relative !== path) return relative;
+  }
+  return toHomeRelative(path, home, caseSensitivity);
 }
 
 /**
@@ -140,16 +243,33 @@ export function groupStack(tools: readonly ToolEntry[]): StackGroup[] {
 }
 
 /**
+ * The wordmark, printed above every terminal report. A report that gets
+ * screenshotted should say what produced it, and the version is what makes a
+ * screenshot answerable a year later.
+ *
+ * Bold with a dim version rather than a brand color: bold is the one emphasis
+ * that survives every terminal theme, and the four colors this report does own
+ * are spent on the tool types, where they carry meaning.
+ */
+function masthead(): string {
+  return `${c.bold('devcat')} ${c.dim(`v${CLI_VERSION}`)}`;
+}
+
+/**
  * Grouped terminal report:
+ *
+ *   devcat v0.2.2
  *
  *   ✓ Your AI-coding stack — 21 tools
  *
  *   Claude Code · 16 tools
- *      12 mcp      alpha, beta, gamma, …
- *       4 plugin   swift-lsp, vercel
+ *     ██████  12 mcp      alpha, beta, gamma, …
+ *     ██       4 plugin   swift-lsp, vercel
  *
  *   21 tools in Claude Code, Codex, and Cursor · 8 locations checked
  *   3 project-scoped · 18 user-wide
+ *
+ *   Share it — npx devcat-cli --markdown
  */
 export function renderStackReport(result: DetectResult): string {
   if (result.tools.length === 0) return renderEmptyStack(result);
@@ -158,15 +278,26 @@ export function renderStackReport(result: DetectResult): string {
   const total = result.tools.length;
   const lines: string[] = [];
 
+  lines.push(masthead());
+  lines.push('');
   lines.push(`${SUCCESS_GLYPH} ${c.bold(`Your AI-coding stack — ${plural(total, 'tool')}`)}`);
+
+  // One scale for every bar in the report, so two rows of equal length mean
+  // equal counts wherever they sit.
+  const maxTypeCount = Math.max(...groups.flatMap((g) => g.byType.map((t) => t.names.length)));
 
   for (const group of groups) {
     lines.push('');
     lines.push(`${c.bold(group.label)} ${c.dim(`· ${plural(group.total, 'tool')}`)}`);
     for (const { type, names } of group.byType) {
-      const count = c.bold(String(names.length).padStart(3));
-      const label = c.cyan(type.padEnd(TYPE_WIDTH));
-      const prefix = `  ${count} ${label}`;
+      const accent = TYPE_ACCENT[type];
+      // Padding stays outside the color wrapper: the escape codes hug the
+      // glyphs, so a stripped line is the plain line, space for space.
+      const bar = renderBar(names.length, maxTypeCount);
+      const barCell = `${accent(bar)}${' '.repeat(BAR_WIDTH - bar.length)}`;
+      const count = c.bold(String(names.length).padStart(COUNT_WIDTH));
+      const label = accent(type.padEnd(TYPE_WIDTH));
+      const prefix = `${' '.repeat(ROW_INDENT)}${barCell} ${count} ${label}`;
       const wrapped = wrap(names.map(sanitizeName).join(', '), WRAP_WIDTH - NAME_COLUMN);
       lines.push(`${prefix}${wrapped[0]}`);
       for (const cont of wrapped.slice(1)) {
@@ -199,8 +330,20 @@ export function renderStackReport(result: DetectResult): string {
     lines.push(c.yellow(truncationFootnote(result.truncations)));
   }
 
+  lines.push('');
+  lines.push(c.dim(SHARE_HINT));
+
   return lines.join('\n');
 }
+
+/**
+ * Closing line of a non-empty report. Dim, so it sits under the result rather
+ * than competing with it — the report is the product, this is the next step.
+ *
+ * Deliberately absent from the empty-state report: there is nothing to share
+ * yet, and that state already ends on the step that is actually worth taking.
+ */
+const SHARE_HINT = 'Share it — npx devcat-cli --markdown';
 
 /**
  * One line admitting the report is incomplete. Short on purpose — the detail
@@ -324,16 +467,19 @@ const MARKDOWN_FOOTER =
 
 /**
  * Nothing found. Print the paths that were checked so the user can spot the
- * config location the CLI does not know about yet. Paths under $HOME print
- * home-relative (~/.claude/skills) — display only; --json's paths_checked
- * stays absolute for scripts.
+ * config location the CLI does not know about yet. Paths under the current
+ * directory print `.`-relative and paths under $HOME print home-relative —
+ * display only; --json's paths_checked stays absolute for scripts.
  */
 function renderEmptyStack(result: DetectResult): string {
   const home = homedir();
+  const cwd = process.cwd();
   const list = result.pathsScanned
-    .map((p) => `  - ${toHomeRelative(sanitizeName(p), home)}`)
+    .map((p) => `  ${c.dim('-')} ${displayPath(sanitizeName(p), home, cwd)}`)
     .join('\n');
   const lines = [
+    masthead(),
+    '',
     `${SUCCESS_GLYPH} ${c.bold('No AI tooling detected on this machine yet.')}`,
     '',
     'Looked in:',

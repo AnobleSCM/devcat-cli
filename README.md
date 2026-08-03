@@ -20,23 +20,27 @@ That's the whole thing — the report above is what it prints.
 <summary>The same output as text</summary>
 
 ```
+devcat v0.2.2
+
 ✓ Your AI-coding stack — 23 tools
 
 Claude Code · 18 tools
-    6 mcp      context7, github, linear, playwright, sentry, supabase
-    3 plugin   pr-review-toolkit, superpowers, typescript-lsp
-    6 skill    brainstorming, deep-research, handoff, research-notes, tdd,
-               writing-plans
-    3 subagent code-reviewer, debugger, test-engineer
+  ██████   6 mcp      context7, github, linear, playwright, sentry, supabase
+  ███      3 plugin   pr-review-toolkit, superpowers, typescript-lsp
+  ██████   6 skill    brainstorming, deep-research, handoff, research-notes,
+                      tdd, writing-plans
+  ███      3 subagent code-reviewer, debugger, test-engineer
 
 Codex · 3 tools
-    3 mcp      exa, node-repl, serena
+  ███      3 mcp      exa, node-repl, serena
 
 Cursor · 2 tools
-    2 mcp      figma, postgres
+  ██       2 mcp      figma, postgres
 
 23 tools in Claude Code, Codex, and Cursor · 13 locations checked
 2 project-scoped · 21 user-wide
+
+Share it — npx devcat-cli --markdown
 ```
 
 </details>
@@ -97,7 +101,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ```json
 {
-  "cli_version": "0.2.1",
+  "cli_version": "0.2.2",
   "total": 23,
   "project_scoped": 2,
   "user_scoped": 21,
