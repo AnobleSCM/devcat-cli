@@ -1,0 +1,25 @@
+src/version.ts
+  s_d0f986f367b470::t_f15926f532fbe5 7
+test/unit/version.parity.test.ts
+  s_d0f986f367b470::t_06302bd0205bcb 1-13
+test/unit/api/client.test.ts
+  s_d0f986f367b470::t_3bfa70a854fbc6 23
+test/unit/auth/deviceFlow.test.ts
+  s_d0f986f367b470::t_0e7059175f29b9 266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f8a184765150673a653f3d940bceba97a3f0ccc2",
+  "prompts": {},
+  "sessions": {
+    "s_d0f986f367b470": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d03e6b5b-a493-458a-af49-768dbd78bf8b",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "AnobleSCM <211227905+AnobleSCM@users.noreply.github.com>"
+    }
+  }
+}
