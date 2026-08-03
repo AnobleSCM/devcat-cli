@@ -121,7 +121,7 @@ Nothing else inside a config is retained: environment variable values, command-l
 
 Separately from file contents, the CLI records **where it looked**. Each entry keeps the config location it came from, its scope, its client, and — for skills and subagents — the resolved directory path used to deduplicate. Those are scan facts, not file contents. They appear in `--json` output (`paths_checked`, and the locations named in any truncation warning), and the same locations are listed in the terminal report when nothing is found.
 
-`paths_checked` is **the location each detector resolved to** — one per config file or directory it consulted, including candidates that turned out not to exist. It is not a trace of the upward walk: finding a project config stats a candidate at every ancestor directory, and those intermediate probes are not recorded. None of it is ever transmitted: see [Profile sync](#profile-sync) for the only thing that leaves the machine.
+`paths_checked` is **the location each detector resolved to** — one per config file or directory it consulted, including candidates that turned out not to exist. It is not a trace of the upward walk: finding a project config stats a candidate in each directory the walk passes through, and those intermediate probes are not recorded. None of it is ever transmitted: see [Profile sync](#profile-sync) for the only thing that leaves the machine.
 
 The directory scans are deliberately shallow and doubly bounded. They read a known config root and its immediate children and never recurse, so a symlink cannot lead the scan out into a large tree. Symlinks are resolved to a canonical path — these directories are usually link farms. Broken links, unreadable directories, and entries that disappear mid-scan are skipped. A directory that errors partway through being read is reported as truncated too — a short list caused by an error is still a short list.
 
@@ -130,7 +130,7 @@ The directory scans are deliberately shallow and doubly bounded. They read a kno
 | Read ceiling | 10,000 entries | The directory is streamed, and reading stops there. The rest is never read. |
 | Examined per root | 500 entries | Of what was read, sorted alphabetically, the first 500 get the per-entry filesystem work. |
 
-Both are far above any real config directory, and below them the result is fully deterministic. If either bites, **the CLI says so** rather than presenting a partial list as complete: a warning naming the root and the counts goes to stderr, the terminal and markdown reports carry a footnote, and `--json` gets a `truncated` flag plus a `truncations` array carrying, per root, `entries_read` (what the ceiling counts, dot-entries included), `entries_seen` (candidates among them), `entries_kept` (examined), `hit_read_ceiling`, and `read_failed`.
+Both sit well above the sizes these directories run to in practice — dozens of entries, not thousands — and below them the result is fully deterministic. If either bites, **the CLI says so** rather than presenting a partial list as complete: a warning naming the root and the counts goes to stderr, the terminal and markdown reports carry a footnote, and `--json` gets a `truncated` flag plus a `truncations` array carrying, per root, `entries_read` (what the ceiling counts, dot-entries included), `entries_seen` (candidates among them), `entries_kept` (examined), `hit_read_ceiling`, and `read_failed`.
 
 Project-scoped entries are found by walking up from the current directory, so the report changes depending on where you run it. `$HOME` is not treated as a project root for any location that also has a user-scope reader — `~/.claude/skills`, `~/.claude/agents`, `~/.codex/config.toml`, `~/.cursor/mcp.json` — so those are never double-counted as project config. `~/.mcp.json` has no user-scope reader, so it is still picked up by the upward walk and reported as project-scoped.
 
@@ -183,7 +183,7 @@ Sync sends MCP servers and plugins only. Skills and subagents are local report d
 
 ## Troubleshooting
 
-**The report is empty.** It lists every path it checked — if your config lives somewhere else, that's the gap. Open an [issue](https://github.com/AnobleSCM/devcat-cli/issues) with the location and it can be added.
+**The report is empty.** It lists the locations each detector resolved to — see [What it reads](#what-it-reads); intermediate parent-directory probes from the upward walk are not recorded. If your config lives somewhere else entirely, that's the gap: open an [issue](https://github.com/AnobleSCM/devcat-cli/issues) with the location and it can be added.
 
 **A tool is missing.** Detected today: MCP servers (Claude Code, Codex, Cursor), Claude Code plugins and subagents, and skills from both the Claude Code and Codex shelves. Skills bundled inside an installed plugin are not counted separately — the plugin itself is listed.
 
