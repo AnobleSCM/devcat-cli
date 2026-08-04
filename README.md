@@ -20,7 +20,7 @@ That's the whole thing — the report above is what it prints.
 <summary>The same output as text</summary>
 
 ```
-devcat v0.2.3
+devcat v0.2.4
 
 ✓ Your AI-coding stack — 26 tools
 
@@ -40,7 +40,7 @@ Kimi Code · 3 tools
 Cursor · 2 tools
   ██       2 mcp      figma, postgres
 
-26 tools in Claude Code, Codex, Kimi Code, and Cursor · 14 locations checked
+26 tools in Claude Code, Codex, Kimi Code, and Cursor · 16 locations checked
 3 project-scoped · 23 user-wide
 
 Share it — npx devcat-cli --markdown
@@ -107,7 +107,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ```json
 {
-  "cli_version": "0.2.3",
+  "cli_version": "0.2.4",
   "total": 26,
   "project_scoped": 3,
   "user_scoped": 23,
@@ -175,7 +175,7 @@ Project-scoped entries are found by walking up from the current directory, so th
 
 - Anything found as a folder — skills, subagents — is identified by its **resolved symlink target**. Two links to one directory are one entry however they are named, and two genuinely different skills that happen to share a name both survive.
 - MCP servers and plugins are keys in a config file with no path of their own, so they are identified by (type, name) — the same identity the server matches on.
-- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Kimi Code before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory that Kimi Code also reads directly at `~/.agents/skills` — no farm of its own needed — so a skill any of the three can see is listed once under Claude Code. A skill only Codex (or only Kimi Code) has still appears under that client.
+- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Kimi Code before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory that Kimi Code also reads directly at `~/.agents/skills` — no farm of its own needed — so a skill any of the three can see is listed once under Claude Code. A skill only Codex (or only Kimi Code) has still appears under that client (Kimi Code: only when installed — see above).
 
 Install it globally if you run it often:
 

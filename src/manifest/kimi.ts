@@ -85,14 +85,19 @@ export async function detectKimiCode(opts: { cwd?: string; scope: 'project' | 'u
 
 /** Pure existence check — no file is read, matching this scanner's names-only philosophy. */
 async function kimiInstalled(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<boolean> {
-  if (opts.scope === 'user') return pathExists(join(homedir(), '.kimi-code'));
-  return opts.cwd != null && (await pathExists(join(opts.cwd, '.kimi-code')));
+  if (opts.scope === 'user') return dirExists(join(homedir(), '.kimi-code'));
+  return opts.cwd != null && (await dirExists(join(opts.cwd, '.kimi-code')));
 }
 
-async function pathExists(path: string): Promise<boolean> {
+/**
+ * True only when `path` is a directory — a stray file named `.kimi-code`
+ * must not open the gate. `stat` (not `lstat`) follows symlinks, so a
+ * symlink to a real directory still passes; that's the one stat() call
+ * this already needed, so the directory check costs nothing extra.
+ */
+async function dirExists(path: string): Promise<boolean> {
   try {
-    await stat(path);
-    return true;
+    return (await stat(path)).isDirectory();
   } catch {
     return false;
   }

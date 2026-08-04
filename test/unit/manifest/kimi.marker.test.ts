@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectKimiCode } from '../../../src/manifest/kimi.js';
@@ -143,5 +143,36 @@ describe('detectKimiCode — install-marker gate', () => {
     // installed it IS Kimi's to report — only the no-marker attribution
     // was the bug, not the with-marker one.
     expect(withMarker.tools.map((t) => t.name)).toContain('shared-tool-skill');
+  });
+
+  it('a FILE named .kimi-code (not a directory) does not open the gate', async () => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'devcat-kimi-gate-filemarker-'));
+    homedirHolder.current = tmpHome;
+    // A stray file, not Kimi's real config directory.
+    writeFileSync(join(tmpHome, '.kimi-code'), 'not a directory\n');
+
+    const result = await detectKimiCode({ scope: 'user' });
+
+    expect(result.tools).toEqual([]);
+    expect(result.pathsScanned).toEqual([]);
+  });
+
+  it('a symlink to a real directory named .kimi-code still opens the gate (stat follows symlinks)', async () => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'devcat-kimi-gate-symlinkmarker-'));
+    homedirHolder.current = tmpHome;
+    const realDir = mkdtempSync(join(tmpdir(), 'devcat-kimi-gate-realdir-'));
+    try {
+      symlinkSync(realDir, join(tmpHome, '.kimi-code'));
+
+      const result = await detectKimiCode({ scope: 'user' });
+
+      expect(result.pathsScanned).toEqual([
+        join(tmpHome, '.kimi-code', 'mcp.json'),
+        join(tmpHome, '.kimi-code', 'skills'),
+        join(tmpHome, '.agents', 'skills'),
+      ]);
+    } finally {
+      rmSync(realDir, { recursive: true, force: true });
+    }
   });
 });
