@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { findUpwardDir, isUserLevelPath } from '../lib/findUpward.js';
@@ -66,10 +66,41 @@ interface SourceScan {
  *     path). detect() scans Claude Code, then Codex, then Kimi Code, so a
  *     skill all three shelves link to is listed once under Claude Code —
  *     deterministically, not by whichever filesystem answered first.
+ *
+ * Install-marker gate: `.agents/skills` is not Kimi's own directory — it is
+ * the shared global install target skills.sh (vercel-labs) uses for several
+ * NON-Kimi tools (Cline, Warp, Zed, Dexto, Loaf). Its mere presence proves
+ * nothing about Kimi, so this whole detector runs only when Kimi's own
+ * config directory exists: `~/.kimi-code` at user scope, `<cwd>/.kimi-code`
+ * at project scope, checked independently (a project-only marker still
+ * runs the project pass with the user pass gated closed, and vice versa).
+ * A missing marker means zero contribution — no tools, and no paths added
+ * to pathsScanned, because nothing was actually checked.
  */
 export async function detectKimiCode(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<SourceScan> {
+  if (!(await kimiInstalled(opts))) return { tools: [], pathsScanned: [] };
   const [mcp, skills] = await Promise.all([detectKimiMcp(opts), detectKimiSkills(opts)]);
   return mergeScans([mcp, skills]);
+}
+
+/** Pure existence check — no file is read, matching this scanner's names-only philosophy. */
+async function kimiInstalled(opts: { cwd?: string; scope: 'project' | 'user' }): Promise<boolean> {
+  if (opts.scope === 'user') return dirExists(join(homedir(), '.kimi-code'));
+  return opts.cwd != null && (await dirExists(join(opts.cwd, '.kimi-code')));
+}
+
+/**
+ * True only when `path` is a directory — a stray file named `.kimi-code`
+ * must not open the gate. `stat` (not `lstat`) follows symlinks, so a
+ * symlink to a real directory still passes; that's the one stat() call
+ * this already needed, so the directory check costs nothing extra.
+ */
+async function dirExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**

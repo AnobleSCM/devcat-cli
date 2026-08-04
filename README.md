@@ -20,7 +20,7 @@ That's the whole thing — the report above is what it prints.
 <summary>The same output as text</summary>
 
 ```
-devcat v0.2.3
+devcat v0.2.4
 
 ✓ Your AI-coding stack — 26 tools
 
@@ -40,7 +40,7 @@ Kimi Code · 3 tools
 Cursor · 2 tools
   ██       2 mcp      figma, postgres
 
-26 tools in Claude Code, Codex, Kimi Code, and Cursor · 14 locations checked
+26 tools in Claude Code, Codex, Kimi Code, and Cursor · 16 locations checked
 3 project-scoped · 23 user-wide
 
 Share it — npx devcat-cli --markdown
@@ -107,7 +107,7 @@ npx devcat-cli --json | jq '.clients[] | {label, total}'
 
 ```json
 {
-  "cli_version": "0.2.3",
+  "cli_version": "0.2.4",
   "total": 26,
   "project_scoped": 3,
   "user_scoped": 23,
@@ -145,10 +145,12 @@ Two kinds of location, read two different ways:
 
 | | Where | How |
 |---|---|---|
-| **MCP servers** | Claude Code `~/.claude.json`, `~/.claude/settings.json`, `.mcp.json` (project) · Codex `~/.codex/config.toml`, `.codex/config.toml` (project) · Kimi Code `~/.kimi-code/mcp.json`, `.kimi-code/mcp.json` (project — read from the exact working directory, not found by an upward walk) · Cursor `~/.cursor/mcp.json`, `.cursor/mcp.json` (project) | The file is read and parsed. Only the server **names** (the keys) are kept. Kimi Code's config is JSON, same `{ "mcpServers": {...} }` shape as Claude Code and Cursor — `config.toml` holds Kimi Code's own settings, never MCP servers. |
+| **MCP servers** | Claude Code `~/.claude.json`, `~/.claude/settings.json`, `.mcp.json` (project) · Codex `~/.codex/config.toml`, `.codex/config.toml` (project) · Kimi Code (only when installed — see below) `~/.kimi-code/mcp.json`, `.kimi-code/mcp.json` (project — read from the exact working directory, not found by an upward walk) · Cursor `~/.cursor/mcp.json`, `.cursor/mcp.json` (project) | The file is read and parsed. Only the server **names** (the keys) are kept. Kimi Code's config is JSON, same `{ "mcpServers": {...} }` shape as Claude Code and Cursor — `config.toml` holds Kimi Code's own settings, never MCP servers. |
 | **Plugins** | Claude Code `~/.claude/plugins/installed_plugins.json` | Same — parsed, keys kept. |
-| **Skills** | Claude Code `~/.claude/skills/`, `.claude/skills/` (project) · Codex `~/.codex/skills/` · Kimi Code `~/.kimi-code/skills/` and `~/.agents/skills/` (user), `.kimi-code/skills/` and `.agents/skills/` (project) | The directory is listed. A child counts as a skill if it contains a `SKILL.md`. **No file is opened** — not even the `SKILL.md`, whose presence is all that is checked. The name is the folder's. |
+| **Skills** | Claude Code `~/.claude/skills/`, `.claude/skills/` (project) · Codex `~/.codex/skills/` · Kimi Code (only when installed — see below) `~/.kimi-code/skills/` and `~/.agents/skills/` (user), `.kimi-code/skills/` and `.agents/skills/` (project) | The directory is listed. A child counts as a skill if it contains a `SKILL.md`. **No file is opened** — not even the `SKILL.md`, whose presence is all that is checked. The name is the folder's. |
 | **Subagents** | Claude Code `~/.claude/agents/`, `.claude/agents/` (project) | The directory is listed. Two shapes count: `<name>.md`, where the name is the file's; and `<name>/<name>.md`, where the name is the folder's and the inner filename must match. A folder holding only other markdown — a README, notes — is not a subagent. **No file is opened.** |
+
+**Kimi Code is the one client gated on its own install marker.** `~/.agents/skills` is not Kimi's directory — it is the shared install target [skills.sh](https://github.com/vercel-labs/skills.sh) uses for several non-Kimi tools (Cline, Warp, Zed, Dexto, Loaf), so its mere presence proves nothing about whether Kimi Code itself is installed. The whole Kimi Code scanner — MCP servers and skills, both scopes — runs only when `~/.kimi-code` (user) or `.kimi-code` under the current directory (project) actually exists on disk; each scope is checked independently, so a project-only marker still scans that project with the user pass gated closed, and vice versa. Without its marker, Kimi Code contributes nothing at all: no section in any report, no entry in `paths_checked`, no line in the empty-state "Looked in" list below — the same "only what was actually checked" discipline `paths_checked` follows everywhere else in this doc.
 
 So: config files are read and parsed, and the only thing taken **out of their contents** is the tool's name. Directory scans open nothing at all.
 
@@ -173,7 +175,7 @@ Project-scoped entries are found by walking up from the current directory, so th
 
 - Anything found as a folder — skills, subagents — is identified by its **resolved symlink target**. Two links to one directory are one entry however they are named, and two genuinely different skills that happen to share a name both survive.
 - MCP servers and plugins are keys in a config file with no path of their own, so they are identified by (type, name) — the same identity the server matches on.
-- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Kimi Code before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory that Kimi Code also reads directly at `~/.agents/skills` — no farm of its own needed — so a skill any of the three can see is listed once under Claude Code. A skill only Codex (or only Kimi Code) has still appears under that client.
+- When two locations do hold the same thing, the first wins in a fixed scan order: project before user, and Claude Code before Codex before Kimi Code before Cursor. `~/.claude/skills` and `~/.codex/skills` are commonly link farms into one shared directory that Kimi Code also reads directly at `~/.agents/skills` — no farm of its own needed — so a skill any of the three can see is listed once under Claude Code. A skill only Codex (or only Kimi Code) has still appears under that client (Kimi Code: only when installed — see above).
 
 Install it globally if you run it often:
 
